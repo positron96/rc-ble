@@ -6,7 +6,10 @@
 			"settings": {},
 			"extensions": [
 				"platformio.platformio-ide",
-				"mhutchie.git-graph"
+				"mhutchie.git-graph",
+				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-themes",
+				"ms-python.python"
 			]
 		}
 	},
