@@ -1,0 +1,31 @@
+{
+    "build": {
+      "cpu": "cortex-m4",
+      "f_cpu": "64000000L",
+      "mcu": "nrf52810",
+      "zephyr": {
+         "variant": "generic_nrf52810"
+      }
+    },
+    "connectivity": [
+      "bluetooth"
+    ],
+    "debug": {
+      "jlink_device": "nRF52810_xxAA",
+      "svd_path": "nrf52.svd"
+    },
+    "frameworks": [
+      "zephyr"
+    ],
+    "name": "nRF52810",
+    "upload": {
+      "maximum_ram_size": 24576,
+      "maximum_size": 196608,
+      "protocol": "blackmagic",
+      "protocols": [
+        "blackmagic"
+      ]
+    },
+    "url": "https://example.com",
+    "vendor": "Vendor Name"
+}
