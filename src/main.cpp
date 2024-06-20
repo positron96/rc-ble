@@ -143,7 +143,7 @@ static CharacteristicCallbacks chrCallbacks;
 void setup() {
     Serial.setPins(30, 28);
     Serial.begin(115200);
-    Serial.println("Starting NimBLE Server");
+    Serial.println("\nStarting NimBLE Server");
 
     /** sets device name */
     NimBLEDevice::init("NimBLE-Arduino");
