@@ -16,21 +16,20 @@ constexpr IRQn_Type servo_irq = TIMER0_IRQn;
 constexpr size_t CHANNELS = 1;
 uint16_t sequence[CHANNELS+1] = {0, 20000};
 uint8_t pins[CHANNELS] = {5};
-volatile size_t idx = 0;
+size_t idx = 0;
 
 void timer_init() {
-
-//NVIC_SetVector(servo_irq, (uint32_t)ISR_LIST[timer_id]);
 
     nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
     nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_CLEAR);
     nrf_timer_bit_width_set(servo_timer, NRF_TIMER_BIT_WIDTH_16);
     nrf_timer_mode_set(servo_timer, NRF_TIMER_MODE_TIMER);
-    //nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_1MHz); // 1us resolution
-    nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_125kHz); // debug
+    nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_1MHz); // 1us resolution
+    // nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_125kHz); // debug
 
     nrf_timer_int_enable(servo_timer, TIMER_INTENSET_COMPARE0_Msk);
     nrf_timer_shorts_enable(servo_timer, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK);
+    nrf_timer_shorts_enable(servo_timer, NRF_TIMER_SHORT_COMPARE0_STOP_MASK);
 
 		// nrf_timer->TASKS_STOP  = 1;  // Stop counter, just in case already running
 		// nrf_timer->TASKS_CLEAR = 1;  // counter to zero
@@ -59,9 +58,10 @@ void servo_start() {
 void servo_stop() {
     NVIC_DisableIRQ(servo_irq);
     nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+    // TODO: set pins to low
 }
 
-void servo_set(size_t pin, size_t us) {
+void servo_set(size_t pin, uint16_t us) {
     logf("servo_set %d\n", us);
     sequence[0] = us;
     sequence[1] = 20000 - us;
@@ -81,6 +81,7 @@ extern "C" void TIMER0_IRQHandler() {
         if(idx>CHANNELS) idx = 0;
         if(idx<CHANNELS) nrf_gpio_pin_set(pins[idx]);
         nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL0, sequence[idx]);
+        nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
 	}
 
 }
