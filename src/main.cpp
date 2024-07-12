@@ -250,10 +250,9 @@ void loop() {
         s.trim();
         val = s.toInt();
         Serial.println(String("Got: ")+val);
-        pwm_set(0, val);
-        //pwm_init();
-
     }
+
+    pwm_set(0, val);
 
 
 
