@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
+#include "pins.h"
+
 constexpr size_t LED_PIN = 18;
 
 static NimBLEServer* pServer;
@@ -76,8 +78,10 @@ class CharacteristicCallbacks: public NimBLECharacteristicCallbacks {
     void onWrite(NimBLECharacteristic* pCharacteristic) {
         Serial.print(pCharacteristic->getUUID().toString().c_str());
         Serial.print(": onWrite(), value: ");
-        Serial.println(pCharacteristic->getValue().c_str());
         val = pCharacteristic->getValue().data()[0];
+        //Serial.println(pCharacteristic->getValue().c_str());
+        Serial.println(val);
+
     };
     /** Called before notification or indication is sent,
      *  the value can be changed here before sending if desired.
@@ -234,11 +238,24 @@ void setup() {
     pAdvertising->start();
 
     Serial.println("Advertising Started");
+    pwm_init();
+
 }
 
 
 void loop() {
-    analogWrite(LED_PIN, val);
+
+    if(Serial.available()) {
+        String s = Serial.readString();
+        s.trim();
+        val = s.toInt();
+        Serial.println(String("Got: ")+val);
+        pwm_set(0, val);
+        //pwm_init();
+
+    }
+
+
 
   /** Do your thing here, this just spams notifications to all connected clients */
     // if(pServer->getConnectedCount()) {
