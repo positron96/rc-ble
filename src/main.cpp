@@ -2,6 +2,7 @@
 #include <NimBLEDevice.h>
 
 #include "pins.h"
+#include "timers.h"
 
 constexpr size_t LED_PIN = 18;
 
@@ -238,7 +239,12 @@ void setup() {
     pAdvertising->start();
 
     Serial.println("Advertising Started");
-    pwm_init();
+    //pwm_init();
+
+    timer_init();
+    val = 127;
+    servo_start();
+    servo_set(5, 500 + val*2048/256);
 
 }
 
@@ -250,9 +256,11 @@ void loop() {
         s.trim();
         val = s.toInt();
         Serial.println(String("Got: ")+val);
+        servo_set(6, 500 + val*2048/256);
     }
 
-    pwm_set(0, val);
+    //pwm_set(0, val);
+
 
 
 
