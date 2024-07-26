@@ -8,7 +8,7 @@ constexpr size_t LED_PIN = 18;
 
 static NimBLEServer* pServer;
 
-uint8_t val;
+volatile uint8_t val;
 
 /**  None of these are required as they will be handled by the library with defaults. **
  **                       Remove as you see fit for your needs                        */
@@ -144,6 +144,11 @@ class DescriptorCallbacks : public NimBLEDescriptorCallbacks {
 static DescriptorCallbacks dscCallbacks;
 static CharacteristicCallbacks chrCallbacks;
 
+uint16_t val2us(uint8_t val) {
+    //return 500 + val*2000/256;
+    return 1000 + val*1000/256;
+}
+
 
 void setup() {
     Serial.setPins(30, 28);
@@ -244,7 +249,7 @@ void setup() {
     timer_init();
     val = 127;
     servo_start();
-    servo_set(5, 500 + val*2048/256);
+    servo_set(val2us(val));
 
 }
 
@@ -256,12 +261,11 @@ void loop() {
         s.trim();
         val = s.toInt();
         Serial.println(String("Got: ")+val);
-        servo_set(6, 500 + val*2048/256);
     }
 
+    servo_set(val2us(val));
+
     //pwm_set(0, val);
-
-
 
 
   /** Do your thing here, this just spams notifications to all connected clients */
