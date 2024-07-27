@@ -28,6 +28,9 @@ constexpr size_t TIMER_RESET_IDX = 3;
 
 size_t idx = 0;
 
+constexpr uint32_t SERVO_CYCLES = 5;
+uint32_t cycles_left;
+
 void timer_init() {
 
     nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
@@ -37,7 +40,7 @@ void timer_init() {
     nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_1MHz); // 1us resolution
     // nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_250kHz); // debug
 
-    //nrf_timer_int_enable(servo_timer, NRF_TIMER_INT_COMPARE3_MASK);
+    nrf_timer_int_enable(servo_timer, NRF_TIMER_INT_COMPARE3_MASK);
 
     nrf_timer_shorts_enable(servo_timer, NRF_TIMER_SHORT_COMPARE3_CLEAR_MASK);
 
@@ -79,12 +82,12 @@ void timer_init() {
 void servo_start() {
     idx = CHANNELS;
     nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL0, 1);
-    //NVIC_EnableIRQ(servo_irq);
+    NVIC_EnableIRQ(servo_irq);
 	nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
 }
 
 void servo_stop() {
-    //NVIC_DisableIRQ(servo_irq);
+    NVIC_DisableIRQ(servo_irq);
     nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
 
     for(const auto &pin: pins) {
@@ -98,28 +101,34 @@ void servo_set(uint16_t us) {
     sequence[0] = us;
     sequence[1] = 20000 - us;
     nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL0, sequence[0]);
+
+    cycles_left = SERVO_CYCLES;
+    nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
 }
 
 
-// extern "C" void servo_isr() {
+extern "C" void servo_isr() {
 
-//     nrf_gpio_pin_toggle(6);
+    //nrf_gpio_pin_toggle(6);
 
-//     // make sure this is a compare event
-//     if (nrf_timer_event_check(servo_timer, NRF_TIMER_EVENT_COMPARE3)) {
-//         // clear event flag
-//         nrf_timer_event_clear(servo_timer, NRF_TIMER_EVENT_COMPARE3);
+    // make sure this is a compare event
+    if (nrf_timer_event_check(servo_timer, NRF_TIMER_EVENT_COMPARE3)) {
+        // clear event flag
+        nrf_timer_event_clear(servo_timer, NRF_TIMER_EVENT_COMPARE3);
 
+        cycles_left--;
+        if(cycles_left == 0) {
+            nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+        }
 
+        // Counter is cleared automatically via SHORTS
+        // if(idx<CHANNELS) nrf_gpio_pin_clear(pins[idx]);
+        // idx += 1;
+        // if(idx>CHANNELS) idx = 0;
+        // if(idx<CHANNELS) nrf_gpio_pin_set(pins[idx]);
+        // nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL0, sequence[idx]);
 
-//         // Counter is cleared automatically via SHORTS
-//         // if(idx<CHANNELS) nrf_gpio_pin_clear(pins[idx]);
-//         // idx += 1;
-//         // if(idx>CHANNELS) idx = 0;
-//         // if(idx<CHANNELS) nrf_gpio_pin_set(pins[idx]);
-//         // nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL0, sequence[idx]);
+        //nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
+	}
 
-//         //nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
-// 	}
-
-// }
+}

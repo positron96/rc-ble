@@ -265,7 +265,7 @@ void loop() {
         Serial.println(String("Got: ")+val);
 
         //last_t = millis();
-        servo_start();
+        //servo_start();
     }
 
     servo_set(val2us(val));
@@ -285,5 +285,4 @@ void loop() {
     // }
 
   delay(100);
-  servo_stop();
 }
