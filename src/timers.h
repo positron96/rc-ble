@@ -7,6 +7,8 @@
 #include <nordic/nrfx/hal/nrf_gpiote.h>
 #include <nordic/nrfx/hal/nrf_ppi.h>
 
+#include <nrfx_coredep.h>
+
 #include <cstdint>
 
 constexpr size_t SERVO_MIN = 500;
@@ -33,7 +35,7 @@ void timer_init() {
     nrf_timer_bit_width_set(servo_timer, NRF_TIMER_BIT_WIDTH_16);
     nrf_timer_mode_set(servo_timer, NRF_TIMER_MODE_TIMER);
     nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_1MHz); // 1us resolution
-    //nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_125kHz); // debug
+    // nrf_timer_frequency_set(servo_timer, NRF_TIMER_FREQ_250kHz); // debug
 
     //nrf_timer_int_enable(servo_timer, NRF_TIMER_INT_COMPARE3_MASK);
 

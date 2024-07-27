@@ -254,13 +254,18 @@ void setup() {
 }
 
 
+
 void loop() {
+    //static uint32_t last_t;
 
     if(Serial.available()) {
         String s = Serial.readString();
         s.trim();
         val = s.toInt();
         Serial.println(String("Got: ")+val);
+
+        //last_t = millis();
+        servo_start();
     }
 
     servo_set(val2us(val));
@@ -280,4 +285,5 @@ void loop() {
     // }
 
   delay(100);
+  servo_stop();
 }
