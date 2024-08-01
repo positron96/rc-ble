@@ -1,16 +1,43 @@
 #pragma once
 
+#include <etl/vector.h>
+
 #include <cstdint>
 #include <cmath>
 
+class Startable;
+etl::vector<Startable*, 10> startables;
+
+struct Startable {
+
+    Startable() { startables.push_back(this); };
+    virtual ~Startable() {
+        auto it = std::find(startables.begin(), startables.end(), this);
+        if(it != startables.end())
+            startables.erase(it);
+    }
+
+    virtual void start() = 0;
+    virtual void stop() = 0;
+};
+
 namespace outputs {
 
-    struct Hbridge {
+    struct Hbridge: Startable {
         virtual void set(int8_t val) = 0;
     };
 
     struct Pin {
         virtual void set(bool val) = 0;
+    };
+
+    struct PwmPin: Pin {
+        uint8_t val_on;
+
+        virtual void set_pwm(uint8_t val) = 0;
+        void set(bool val) override {
+            set_pwm(val ? val_on : 0);
+        }
     };
 
     struct Blinker {
@@ -19,8 +46,13 @@ namespace outputs {
         virtual void restart() = 0;
     };
 
-    struct Servo {
-        virtual void set(int8_t val) = 0;
+    struct Servo: Startable {
+        size_t center = 1500;
+        size_t half_range = 500;
+        virtual void set_us(uint16_t val) = 0;
+        void set(int8_t val) {
+            set_us(center + val*half_range/127);
+        };
     };
 }
 
@@ -50,7 +82,7 @@ namespace fn {
         size_t brake_delay_ticks = ms_to_ticks(500);
         size_t reverse_ticks_left = 0;
         size_t brake_ticks_left = 0;
-        size_t nonzero_limit = 20;
+        int8_t nonzero_limit = 10;
 
         void set(uint8_t val) override {
             // TODO: make it act like an actual gas pedal (to zero --> coast, negative -> break)
@@ -115,4 +147,4 @@ namespace fn {
         }
     };
 
-}
+};
