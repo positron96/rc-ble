@@ -142,10 +142,14 @@ namespace nrf {
         }
     };
 
+    class PWM;
     struct HBridge: fn::Hbridge {
         size_t pin1, pin2;
+        PWM *owner;
+        size_t index;
         HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
-        void set(int8_t val) override {}
+
+        void set(int8_t val) override;
     };
 
     struct PwmPin: fn::PwmPin {
@@ -159,6 +163,9 @@ namespace nrf {
     };
 
     NRF_PWM_Type *pwm = NRF_PWM0;
+    constexpr uint16_t add_edge(const uint16_t v) { return v | 0x8000; }
+    constexpr uint16_t PWM_ZERO = add_edge(0);
+
     class PWM {
     public:
         static constexpr size_t NUM_PINS = NRF_PWM_CHANNEL_COUNT;
@@ -167,17 +174,22 @@ namespace nrf {
 
         bool add_hbridge(HBridge &hbr) {
             if(available_pins()<2) return false;
-            hbridges.push_back(&hbr);
+            hbr.index = pins.size();
+            hbr.owner = this;
+            //hbridges.push_back(&hbr);
+            pins.push_back(hbr.pin1);
+            pins.push_back(hbr.pin2);
             return true;
         }
 
         bool add_pin(PwmPin &pin) {
             if(available_pins()<1) return false;
-            pins.push_back(&pin);
+            pins.push_back(pin.pin);
         }
 
         void init() {
-            uint32_t pins[] {0,1,2,3};
+            uint32_t pins[] {0xFFFF'FFFF, 0xFFFF'FFFF, 0xFFFF'FFFF, 0xFFFF'FFFF};
+            for(size_t i=0; i<this->pins.size(); i++) pins[i] = this->pins[i];
             nrf_pwm_pins_set(pwm, pins);
             nrf_pwm_enable(pwm);
             nrf_pwm_configure(pwm, NRF_PWM_CLK_8MHz, NRF_PWM_MODE_UP, MAX_PWM); // ~20khz
@@ -190,13 +202,37 @@ namespace nrf {
             nrf_pwm_loop_set(pwm, 0);
 
             nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
-            //nrf_pwm_shorts_enable(pwm, PWM_SHORTS_LOOPSDONE_SEQSTART0_Msk);
         }
+
+        void set_hbridge(int8_t val, size_t idx1) {
+            size_t idx2 = idx1+1;
+            if(val==0) { // coast
+                data[idx1] = PWM_ZERO;
+                data[idx2] = PWM_ZERO;
+            } else
+            if(val>0) {
+                data[idx1] = PWM_ZERO;
+                data[idx2] = add_edge(val);
+            } else {
+                data[idx1] = add_edge(-val);
+                data[idx2] = PWM_ZERO;
+            }
+            nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
+        }
+
+        void set_pwm(uint8_t val, size_t idx) {
+            uint16_t v = add_edge(val);
+            if(data[idx] == v)
+                return;
+            data[idx] = v;
+            nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
+        }
+
     private:
-        etl::vector<PwmPin*, 4> pins;
-        etl::vector<HBridge*, 2> hbridges;
-        size_t used_pins() { return pins.size() + hbridges.size()*2; }
-        size_t available_pins() { return NUM_PINS - used_pins(); }
+
+        etl::vector<size_t, 4> pins;
+
+        size_t available_pins() { return NUM_PINS - pins.size(); }
     };
 
     class Pin: public fn::Pin {
@@ -212,4 +248,8 @@ namespace nrf {
 
 void nrf::Servo::set_us(uint16_t us) {
     owner->set_us(index, us);
+};
+
+void nrf::HBridge::set(int8_t val) {
+    owner->set_hbridge(val, index);
 };
