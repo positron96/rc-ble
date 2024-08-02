@@ -24,16 +24,11 @@ extern void process_str(const char* buf, size_t len);
 /**  None of these are required as they will be handled by the library with defaults. **
  **                       Remove as you see fit for your needs                        */
 class ServerCallbacks: public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer) {
-        Serial.println("Client connected");
-        Serial.println("Multi-connect support: start advertising");
-        NimBLEDevice::startAdvertising();
-    };
     /** Alternative onConnect() method to extract details of the connection.
      *  See: src/ble_gap.h for the details of the ble_gap_conn_desc struct.
      */
     void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
-        Serial.print("Client address: ");
+        Serial.print("Client connected: ");
         Serial.println(NimBLEAddress(desc->peer_ota_addr).toString().c_str());
         /** We can use the connection handle here to ask for different connection parameters.
          *  Args: connection handle, min connection interval, max connection interval
@@ -172,9 +167,11 @@ class DescriptorCallbacks : public NimBLEDescriptorCallbacks {
 static DescriptorCallbacks dscCallbacks;
 static CharacteristicCallbacks chrCallbacks;
 
+NimBLECharacteristic* pBatChar;
+
 void ble_start() {
     /** sets device name */
-    NimBLEDevice::init("RC");
+    NimBLEDevice::init("MicroRC");
 
     /** Optional: set the transmit power, default is 0db */
     NimBLEDevice::setPower(9); /** +9db */
@@ -193,13 +190,16 @@ void ble_start() {
      *  These are the default values, only shown here for demonstration.
      */
     //NimBLEDevice::setSecurityAuth(false, false, true);
-    NimBLEDevice::setSecurityAuth(/*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/ BLE_SM_PAIR_AUTHREQ_SC);
+    NimBLEDevice::setSecurityAuth(
+        /*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/
+        BLE_SM_PAIR_AUTHREQ_SC
+    );
 
     pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new ServerCallbacks());
 
-    NimBLEService* pService = pServer->createService(NRF_UART_SERVICE_UUID);
-    NimBLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+    NimBLEService* pUartSvc = pServer->createService(NRF_UART_SERVICE_UUID);
+    NimBLECharacteristic* pRxCharacteristic = pUartSvc->createCharacteristic(
         NRF_UART_RX_CHAR_UUID,
         NIMBLE_PROPERTY::WRITE_NR,
     /** Require a secure connection for read and write access */
@@ -207,7 +207,7 @@ void ble_start() {
     //    NIMBLE_PROPERTY::WRITE_ENC   // only allow writing if paired / encrypted
         NRF_UART_CHAR_SIZE
     );
-    NimBLECharacteristic* pTxCharacteristic = pService->createCharacteristic(
+    NimBLECharacteristic* pTxCharacteristic = pUartSvc->createCharacteristic(
         NRF_UART_TX_CHAR_UUID,
         NIMBLE_PROPERTY::NOTIFY,
         NRF_UART_CHAR_SIZE
@@ -244,20 +244,26 @@ void ble_start() {
     // pC01Ddsc->setValue("Send it back!");
     // pC01Ddsc->setCallbacks(&dscCallbacks);
 
-    /** Start the services when finished creating all Characteristics and Descriptors */
-    pService->start();
+    pUartSvc->start();
     // pBaadService->start();
+
+    constexpr uint16_t BLE_SVC_BAS_UUID16 = 0x180F;
+    constexpr uint16_t BLE_SVC_BAS_CHR_UUID16_BATTERY_LEVEL = 0x2A19;
+
+    auto pBatSvc = pServer->createService(BLE_SVC_BAS_UUID16);
+    pBatChar = pBatSvc->createCharacteristic(BLE_SVC_BAS_CHR_UUID16_BATTERY_LEVEL, NIMBLE_PROPERTY::READ, 1);
+    pBatChar->setValue<uint8_t>(50);
+    pBatSvc->start();
 
     NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
     /** Add the services to the advertisment data **/
-    pAdvertising->addServiceUUID(pService->getUUID());
+    pAdvertising->addServiceUUID(pUartSvc->getUUID());
     //pAdvertising->addServiceUUID(pBaadService->getUUID());
     /** If your device is battery powered you may consider setting scan response
      *  to false as it will extend battery life at the expense of less data sent.
      */
     //pAdvertising->setScanResponse(true);
     pAdvertising->start();
-
 
     logs("Advertising Started");
 }

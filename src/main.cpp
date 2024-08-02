@@ -33,13 +33,13 @@ nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left{D1};
 nrf::Pin pin_light_right{D2};
 nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_brake{D4};
+nrf::Pin pin_light_brake{D6}; // D4 intended, but it's not on devboard
 nrf::Pin pin_light_main{D5};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
-fn::Driving drive{&hbridge, &pin_light_reverse, &pin_light_brake};
+fn::Driving driver{&hbridge, &pin_light_reverse, &pin_light_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 
@@ -58,7 +58,7 @@ void setup() {
     nrf::PWM pwm;
     //pwm.add_hbridge(hbridge);
 
-    functions.push_back(&drive);
+    functions.push_back(&driver);
 
     if(!servo_timer.add_servo(steer_servo)) {
         Serial.println("servo add err");
@@ -102,11 +102,14 @@ void process_str(const char* buf, size_t len) {
     }
     //logf("ch %d = %d\n", ch_num.value(), val.value());
     functions[ch_num.value()]->set(val.value());
+
 }
 
 
 void loop() {
     //static uint32_t last_t;
+    //int voltage = analogRead(30);
+
 
     if(Serial.available()) {
         String s = Serial.readString();
@@ -128,5 +131,6 @@ void loop() {
     delay(fn::Ticking::PERIOD_MS);
     bl_right.tick();
     bl_left.tick();
+    driver.tick();
 
 }
