@@ -11,18 +11,18 @@ volatile uint8_t val;
 
 etl::vector<fn::Fn*, 10> functions;
 
-constexpr size_t D1 = 14;
-constexpr size_t D2 = 16;
-constexpr size_t D3 = 20;
-constexpr size_t D4 = 5;
-constexpr size_t D5 = 6;
-constexpr size_t D6 = 9;
-constexpr size_t D7 = 10;
+constexpr size_t D1 = 5;
+constexpr size_t D2 = 6;
+constexpr size_t D3 = 9;
+constexpr size_t D4 = 10;
+constexpr size_t D5 = 14;
+constexpr size_t D6 = 16;
+constexpr size_t D7 = 20;
 constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
 
 nrf::HBridge hbridge{M1, M2};
-nrf::Servo steer_servo{D6};
+nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left{D1};
 nrf::Pin pin_light_right{D2};
 nrf::Pin pin_light_reverse{D3};
@@ -38,6 +38,10 @@ fn::Simple main_light{&pin_light_main};
 
 nrf::ServoTimer servo_timer;
 
+extern "C" void TIMER1_IRQHandler() {
+    servo_timer.isr();
+};
+
 
 void setup() {
     Serial.setPins(30, 28);
@@ -45,7 +49,7 @@ void setup() {
     Serial.println("\nStarting NimBLE Server");
 
     nrf::PWM pwm;
-    pwm.setHBridge(hbridge);
+    //pwm.add_hbridge(hbridge);
 
     functions.push_back(&drive);
 
@@ -73,22 +77,18 @@ void loop() {
         Serial.println(String("Got: ")+val);
 
         //functions[0]->set(val);
-        steer_servo.set(val);
+        //steer_servo.set(val);
+        steering.set(val);
+        //main_light.set(val);
+        //bl_right.set(val>127);
+        //bl_left.set(val>127);
 
         //last_t = millis();
         //servo_start();
     }
 
-  /** Do your thing here, this just spams notifications to all connected clients */
-    // if(pServer->getConnectedCount()) {
-    //     NimBLEService* pSvc = pServer->getServiceByUUID("BAAD");
-    //     if(pSvc) {
-    //         NimBLECharacteristic* pChr = pSvc->getCharacteristic("F00D");
-    //         if(pChr) {
-    //             pChr->notify(true);
-    //         }
-    //     }
-    // }
-
     delay(fn::Ticking::PERIOD_MS);
+    bl_right.tick();
+    bl_left.tick();
+
 }

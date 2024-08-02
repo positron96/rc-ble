@@ -230,6 +230,17 @@ void ble_start() {
     //pAdvertising->setScanResponse(true);
     pAdvertising->start();
 
-    
+
     Serial.println("Advertising Started");
 }
+
+  /** Do your thing here, this just spams notifications to all connected clients */
+    // if(pServer->getConnectedCount()) {
+    //     NimBLEService* pSvc = pServer->getServiceByUUID("BAAD");
+    //     if(pSvc) {
+    //         NimBLECharacteristic* pChr = pSvc->getCharacteristic("F00D");
+    //         if(pChr) {
+    //             pChr->notify(true);
+    //         }
+    //     }
+    // }

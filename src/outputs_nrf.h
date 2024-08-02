@@ -4,6 +4,10 @@
 #include <nordic/nrfx/hal/nrf_gpio.h>
 #include <nordic/nrfx/hal/nrf_gpiote.h>
 #include <nordic/nrfx/hal/nrf_ppi.h>
+#include <nordic/nrfx/hal/nrf_pwm.h>
+
+#include <etl/vector.h>
+#include <etl/array.h>
 
 #include "functions.h"
 
@@ -36,6 +40,8 @@ namespace nrf {
 
         etl::vector<Servo*, MAX_SERVOS> servos;
 
+        bool running = false;
+
         bool add_servo(Servo &servo) {
             if(servos.available()==0) return false;
             servo.index = servos.size();
@@ -48,8 +54,7 @@ namespace nrf {
             nrf_timer_cc_set(servo_timer, (nrf_timer_cc_channel_t)idx, us);
             logf("set_us %d\n", us);
             cycles_left = SERVO_CYCLES;
-            NVIC_EnableIRQ(servo_irq);
-            nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
+            set_paused(false);
         }
 
         void init() {
@@ -100,19 +105,35 @@ namespace nrf {
             }
         }
 
-        static void isr() {
+        void set_paused(bool to_pause) {
+            if(!running && !to_pause) {
+                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
+                NVIC_EnableIRQ(servo_irq);
+                running = true;
+            }
+            if(running && to_pause) {
+                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+                NVIC_DisableIRQ(servo_irq);
+                running = false;
+                // release GPIO to that it can be controlled with GPIO
+                //nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
+
+            }
+        }
+
+        void isr() {
             if (nrf_timer_event_check(servo_timer, NRF_TIMER_EVENT_COMPARE3)) {
                 // clear event flag
                 nrf_timer_event_clear(servo_timer, NRF_TIMER_EVENT_COMPARE3);
                 cycles_left--;
                 if(cycles_left == 0) {
-                    nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+                    set_paused(true);
                 }
             }
         }
     private:
         static constexpr size_t SERVO_CYCLES = 5;
-        static size_t cycles_left;
+        size_t cycles_left;
 
         static constexpr nrf_ppi_channel_t PPI_FIRST_CH = NRF_PPI_CHANNEL6;
 
@@ -127,26 +148,61 @@ namespace nrf {
         void set(int8_t val) override {}
     };
 
-    class PwmPin: public fn::PwmPin {
+    struct PwmPin: fn::PwmPin {
+        size_t pin;
 
+        size_t idx;
+        PwmPin(size_t p): pin{p} {}
+        void set_pwm(uint8_t val) override {
+
+        };
     };
 
+    NRF_PWM_Type *pwm = NRF_PWM0;
     class PWM {
     public:
-        bool setHBridge(HBridge &ret) {
+        static constexpr size_t NUM_PINS = NRF_PWM_CHANNEL_COUNT;
+        static constexpr size_t MAX_PWM = 255;
+        etl::array<uint16_t, NUM_PINS> data;
+
+        bool add_hbridge(HBridge &hbr) {
+            if(available_pins()<2) return false;
+            hbridges.push_back(&hbr);
             return true;
         }
 
-        bool setPin(PwmPin &pin) {
-            return true;
+        bool add_pin(PwmPin &pin) {
+            if(available_pins()<1) return false;
+            pins.push_back(&pin);
         }
 
+        void init() {
+            uint32_t pins[] {0,1,2,3};
+            nrf_pwm_pins_set(pwm, pins);
+            nrf_pwm_enable(pwm);
+            nrf_pwm_configure(pwm, NRF_PWM_CLK_8MHz, NRF_PWM_MODE_UP, MAX_PWM); // ~20khz
+
+            nrf_pwm_decoder_set(pwm, NRF_PWM_LOAD_INDIVIDUAL, NRF_PWM_STEP_AUTO); //NRF_PWM_STEP_TRIGGERED
+            nrf_pwm_seq_ptr_set(pwm, 0, data.data());
+            nrf_pwm_seq_cnt_set(pwm, 0, data.size());
+            nrf_pwm_seq_refresh_set(pwm, 0, 1);
+            nrf_pwm_seq_end_delay_set(pwm, 0, 0);
+            nrf_pwm_loop_set(pwm, 0);
+
+            nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
+            //nrf_pwm_shorts_enable(pwm, PWM_SHORTS_LOOPSDONE_SEQSTART0_Msk);
+        }
+    private:
+        etl::vector<PwmPin*, 4> pins;
+        etl::vector<HBridge*, 2> hbridges;
+        size_t used_pins() { return pins.size() + hbridges.size()*2; }
+        size_t available_pins() { return NUM_PINS - used_pins(); }
     };
 
     class Pin: public fn::Pin {
     public:
         size_t pin;
-        Pin(size_t num) : pin{num} {}
+        Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
         void set(bool v) override {
             nrf_gpio_pin_write(pin, v ? 1 : 0);
         }
@@ -154,14 +210,6 @@ namespace nrf {
 
 };
 
-
 void nrf::Servo::set_us(uint16_t us) {
     owner->set_us(index, us);
 };
-
-
-extern "C" void TIMER1_IRQHandler() {
-    nrf::ServoTimer::isr();
-};
-
-size_t nrf::ServoTimer::cycles_left = 0;

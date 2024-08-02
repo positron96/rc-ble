@@ -29,7 +29,7 @@ namespace fn {
     struct Ticking {
         static constexpr size_t TICK_FREQ = 50;
         static constexpr size_t PERIOD_MS = 1000 / TICK_FREQ;
-        static constexpr size_t ms_to_ticks(const size_t ms) { return ms/TICK_FREQ;};
+        static constexpr size_t ms_to_ticks(const size_t ms) { return ms/PERIOD_MS;};
         virtual void tick() = 0;
     };
 
@@ -54,7 +54,7 @@ namespace fn {
     struct Blinker: Ticking {
         Pin *pin;
 
-        Blinker(Pin *p): pin{p} {}
+        Blinker(Pin *p): pin{p}, half_period_ticks{ms_to_ticks(500)} {}
 
         void set(bool val) {
             if(val!=on) {
@@ -66,14 +66,14 @@ namespace fn {
         void restart() {
             phase = 0;
         }
-        void set_period(uint32_t ms) { period_ticks = ms_to_ticks(ms); }
+        void set_period(uint32_t ms) { half_period_ticks = ms_to_ticks(ms)/2; }
         void tick() override {
             phase++;
-            if(phase == period_ticks/2) { pin->set(false);}
-            if(phase == period_ticks) { if(on){phase=0; pin->set(true); }}
+            if(phase == half_period_ticks) { pin->set(false);} else
+            if(phase == half_period_ticks*2) { if(on){phase=0;pin->set(true);}}
         }
     private:
-        size_t period_ticks;
+        size_t half_period_ticks;
         size_t phase = 0;
         bool on;
     };
@@ -148,29 +148,34 @@ namespace fn {
         Steering(Servo *s, Blinker *l, Blinker *r) : servo{s}, left{l}, right{r} {}
 
         void set(uint8_t val) override {
-            value = val;
-            servo->set(value);
+            servo->set(val);
+            value = to_signed(val);
             if (value > nonzero_limit) {
                 left->set(true);
+                right->set(false);
             } else
             if (value < -nonzero_limit) {
                 right->set(true);
+                left->set(false);
+            } else {
+                left->set(false);
+                right->set(false);
             }
         }
 
         void reset_ticks() { blinker_ticks_left = blinker_timeout_ticks;}
 
         void tick() override {
-            if(abs(value) > nonzero_limit) reset_ticks();
-            if(blinker_ticks_left == 0) {
-                right->set(false);
-                left->set(false);
-            } else {
-                blinker_ticks_left--;
-            }
+            // if(abs(value) > nonzero_limit) reset_ticks();
+            // if(blinker_ticks_left == 0) {
+            //     right->set(false);
+            //     left->set(false);
+            // } else {
+            //     blinker_ticks_left--;
+            // }
         }
     private:
-        uint8_t value;
+        int8_t value;
     };
 
     struct Simple: Fn {
