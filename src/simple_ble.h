@@ -40,8 +40,7 @@ class ServerCallbacks: public NimBLEServerCallbacks {
         pServer->updateConnParams(desc->conn_handle, 24, 48, 0, 60);
     };
     void onDisconnect(NimBLEServer* pServer) {
-        Serial.println("Client disconnected - start advertising");
-        NimBLEDevice::startAdvertising();
+        Serial.println("Client disconnected");
     };
     void onMTUChange(uint16_t MTU, ble_gap_conn_desc* desc) {
         Serial.printf("MTU updated: %u for connection ID: %u\n", MTU, desc->conn_handle);
@@ -197,6 +196,7 @@ void ble_start() {
 
     pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new ServerCallbacks());
+    pServer->advertiseOnDisconnect(true);
 
     NimBLEService* pUartSvc = pServer->createService(NRF_UART_SERVICE_UUID);
     NimBLECharacteristic* pRxCharacteristic = pUartSvc->createCharacteristic(

@@ -52,7 +52,7 @@ namespace nrf {
 
         void set_us(size_t idx, uint16_t us) {
             nrf_timer_cc_set(servo_timer, (nrf_timer_cc_channel_t)idx, us);
-            logf("set_us %d\n", us);
+            //logf("set_us %d\n", us);
             cycles_left = SERVO_CYCLES;
             set_paused(false);
         }
