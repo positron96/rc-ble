@@ -1,9 +1,16 @@
 #include <Arduino.h>
 
 #include <etl/vector.h>
+#include <etl/string_view.h>
+#include <etl/optional.h>
+#include <etl/to_arithmetic.h>
+#include <etl/string_utilities.h>
+
 
 #include "functions.h"
 #include "outputs_nrf.h"
+
+#include "simple_ble.h"
 
 constexpr size_t LED_PIN = 18;
 
@@ -63,8 +70,39 @@ void setup() {
     functions.push_back(&main_light);
 
     servo_timer.init();
+
+    ble_start();
 }
 
+
+void process_str(const char* buf, size_t len) {
+    //logf("processing '%s'(%d)\n", buf, len);
+    etl::string_view in{buf, len};
+    etl::optional<etl::string_view> token;
+    token = etl::get_token(in, "=", token, true);
+    if(!token) {
+        logf("no ch: '%s'\n", buf);
+        return;
+    }
+    const auto ch_num = etl::to_arithmetic<int8_t>(token.value());
+    if(!ch_num.has_value()) {
+        logf("ch parsing failed: '%s'\n", buf);
+        return;
+    }
+
+    token = etl::get_token(in, ", ", token, true);
+    if(!token) {
+        logf("no val: '%s'\n", buf);
+        return;
+    }
+    const auto val = etl::to_arithmetic<uint8_t>(token.value());
+    if(!val.has_value()) {
+        logf("val parsing failed: '%s'\n", buf);
+        return;
+    }
+    //logf("ch %d = %d\n", ch_num.value(), val.value());
+    functions[ch_num.value()]->set(val.value());
+}
 
 
 void loop() {

@@ -12,6 +12,10 @@ void logs(const char* msg) {
     puts(msg);
 }
 
+void logln(const char* msg) {
+    printf("%s", msg);
+}
+
 /** Not reentrant! */
 void vlogf(const char * fmt, va_list args) {
     vprintf(fmt, args);

@@ -58,6 +58,7 @@ namespace fn {
 
         void set(bool val) {
             if(val!=on) {
+                logf("blinker(%d) = %d\n", (size_t)pin, val);
                 on = val;
                 pin->set(val);
                 phase = 0;

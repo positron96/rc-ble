@@ -4,7 +4,21 @@
 
 #include <Arduino.h>
 
+#include "log.h"
+
 static NimBLEServer* pServer;
+
+// NORDIC UART service UUID
+#define NRF_UART_SERVICE_UUID  "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+#define NRF_UART_RX_CHAR_UUID  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define NRF_UART_TX_CHAR_UUID  "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+#define NRF_UART_CHAR_SIZE 20
+#define NRF_UART_RX_BUFFER_SIZE 128
+
+char rx_buf[NRF_UART_RX_BUFFER_SIZE];
+size_t rx_pos = 0;
+
+extern void process_str(const char* buf, size_t len);
 
 
 /**  None of these are required as they will be handled by the library with defaults. **
@@ -73,13 +87,31 @@ class CharacteristicCallbacks: public NimBLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
     };
 
-    void onWrite(NimBLECharacteristic* pCharacteristic) {
-        Serial.print(pCharacteristic->getUUID().toString().c_str());
-        Serial.print(": onWrite(), value: ");
-        val = pCharacteristic->getValue().data()[0];
-        //Serial.println(pCharacteristic->getValue().c_str());
-        Serial.println(val);
+    void onWrite(NimBLECharacteristic* chr) {
+        // Serial.print(pCharacteristic->getUUID().toString().c_str());
+        // Serial.print(": onWrite(), value: ");
 
+        NimBLEAttValue val = chr->getValue();
+        const char* in = (const char*)(val.data());
+        for (size_t i = 0; i < val.size(); i++) {
+            char c = in[i];
+            if(c == 0) {
+                continue;
+            } else
+            if(c == '\n') {
+                rx_buf[rx_pos] = 0;
+                process_str(rx_buf, rx_pos);
+                rx_pos = 0;
+            } else {
+                if(rx_pos<NRF_UART_RX_BUFFER_SIZE) {
+                    rx_buf[rx_pos++] = c;
+                } else {
+                    rx_pos = 0;
+                    logs("Buffer overflow!\n");
+                }
+            }
+
+        }
     };
     /** Called before notification or indication is sent,
      *  the value can be changed here before sending if desired.
@@ -131,8 +163,7 @@ class DescriptorCallbacks : public NimBLEDescriptorCallbacks {
     };
 
     void onRead(NimBLEDescriptor* pDescriptor) {
-        Serial.print(pDescriptor->getUUID().toString().c_str());
-        Serial.println(" Descriptor read");
+        logf("%s: descr read\n", pDescriptor->getUUID().toString().c_str());
     };
 };
 
@@ -143,7 +174,7 @@ static CharacteristicCallbacks chrCallbacks;
 
 void ble_start() {
     /** sets device name */
-    NimBLEDevice::init("NimBLE-Arduino");
+    NimBLEDevice::init("RC");
 
     /** Optional: set the transmit power, default is 0db */
     NimBLEDevice::setPower(9); /** +9db */
@@ -167,28 +198,25 @@ void ble_start() {
     pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new ServerCallbacks());
 
-    NimBLEService* pService = pServer->createService("DEAD");
-    NimBLECharacteristic* pCharacteristic = pService->createCharacteristic(
-                                               "BEEF",
-                                               NIMBLE_PROPERTY::READ |
-                                               NIMBLE_PROPERTY::WRITE
-                               /** Require a secure connection for read and write access */
-                                            //    NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
-                                            //    NIMBLE_PROPERTY::WRITE_ENC   // only allow writing if paired / encrypted
-                                              );
+    NimBLEService* pService = pServer->createService(NRF_UART_SERVICE_UUID);
+    NimBLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+        NRF_UART_RX_CHAR_UUID,
+        NIMBLE_PROPERTY::WRITE_NR,
+    /** Require a secure connection for read and write access */
+    //    NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
+    //    NIMBLE_PROPERTY::WRITE_ENC   // only allow writing if paired / encrypted
+        NRF_UART_CHAR_SIZE
+    );
+    NimBLECharacteristic* pTxCharacteristic = pService->createCharacteristic(
+        NRF_UART_TX_CHAR_UUID,
+        NIMBLE_PROPERTY::NOTIFY,
+        NRF_UART_CHAR_SIZE
+    );
 
-    pCharacteristic->setValue(val);
-    pCharacteristic->setCallbacks(&chrCallbacks);
-
-    /** 2904 descriptors are a special case, when createDescriptor is called with
-     *  0x2904 a NimBLE2904 class is created with the correct properties and sizes.
-     *  However we must cast the returned reference to the correct type as the method
-     *  only returns a pointer to the base NimBLEDescriptor class.
-     */
-    NimBLE2904* pCharTypeDesc = (NimBLE2904*)pCharacteristic->createDescriptor("2904");
-    pCharTypeDesc->setFormat(NimBLE2904::FORMAT_UINT8);
-    pCharTypeDesc->setCallbacks(&dscCallbacks);
-
+    pRxCharacteristic->setValue(0);
+    pRxCharacteristic->setCallbacks(&chrCallbacks);
+    pTxCharacteristic->setValue(0);
+    pTxCharacteristic->setCallbacks(&chrCallbacks);
 
     // NimBLEService* pBaadService = pServer->createService("BAAD");
     // NimBLECharacteristic* pFoodCharacteristic = pBaadService->createCharacteristic(
@@ -231,7 +259,7 @@ void ble_start() {
     pAdvertising->start();
 
 
-    Serial.println("Advertising Started");
+    logs("Advertising Started");
 }
 
   /** Do your thing here, this just spams notifications to all connected clients */
