@@ -22,7 +22,7 @@ etl::vector<fn::Fn*, 10> functions;
 constexpr size_t D1 = 5;
 constexpr size_t D2 = 6;
 constexpr size_t D3 = 9;
-constexpr size_t D4 = 10;
+constexpr size_t D4 = 10; // not on devboard
 constexpr size_t D5 = 14;
 constexpr size_t D6 = 16;
 constexpr size_t D7 = 20;
@@ -31,11 +31,11 @@ constexpr size_t M2 = 28;
 
 nrf::HBridge hbridge{M1, M2};
 nrf::Servo steer_servo{D7};
-nrf::Pin pin_light_left{D1};
-nrf::Pin pin_light_right{D2};
+nrf::Pin pin_light_left{D5};
+nrf::Pin pin_light_right{D6};
+nrf::Pin pin_light_main{D1};
+nrf::Pin pin_light_brake{D2};
 nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_brake{D6}; // D4 intended, but it's not on devboard
-nrf::Pin pin_light_main{D5};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
@@ -85,7 +85,8 @@ void process_str(const char* buf, size_t len) {
         logf("no ch: '%s'\n", buf);
         return;
     }
-    const auto ch_num = etl::to_arithmetic<int8_t>(token.value());
+    auto data = etl::trim_view_whitespace(token.value());
+    const auto ch_num = etl::to_arithmetic<int8_t>(data);
     if(!ch_num.has_value()) {
         logf("ch parsing failed: '%s'\n", buf);
         return;
@@ -96,7 +97,8 @@ void process_str(const char* buf, size_t len) {
         logf("no val: '%s'\n", buf);
         return;
     }
-    const auto val = etl::to_arithmetic<uint8_t>(token.value());
+    data = etl::trim_view_whitespace(token.value()) ;
+    const auto val = etl::to_arithmetic<uint8_t>(data);
     if(!val.has_value()) {
         logf("val parsing failed: '%s'\n", buf);
         return;
@@ -161,7 +163,7 @@ void loop() {
         break;
     }
     case State::RecentlyDisconnected:
-        if(millis() - disconnect_time > 10000) {
+        if(millis() - disconnect_time > 5000) {
             bl_left.set(false);
             bl_right.set(false);
             state = State::Hibernation;
