@@ -9,6 +9,7 @@
 
 #include "functions.h"
 #include "outputs_nrf.h"
+#include "line_processor.h"
 
 #include "simple_ble.h"
 
@@ -105,6 +106,13 @@ void process_str(const char* buf, size_t len) {
 
 }
 
+enum class State {
+    Running, ///< there are connected clients
+    RecentlyDisconnected, ///< client disconnected not long ago,
+    Hibernation, ///< show almost no signs of life (except BLE)
+};
+
+line_processor::LineProcessor<> serial_rx(line_processor::callback_t::create<process_str>());
 
 void loop() {
     //static uint32_t last_t;
@@ -112,25 +120,62 @@ void loop() {
 
 
     if(Serial.available()) {
-        String s = Serial.readString();
-        s.trim();
-        val = s.toInt();
-        Serial.println(String("Got: ")+val);
-
-        //functions[0]->set(val);
-        //steer_servo.set(val);
-        steering.set(val);
-        //main_light.set(val);
-        //bl_right.set(val>127);
-        //bl_left.set(val>127);
-
-        //last_t = millis();
-        //servo_start();
+        while(Serial.available()>0) {serial_rx.add(Serial.read());}
     }
 
-    delay(fn::Ticking::PERIOD_MS);
+    static State state = State::RecentlyDisconnected;
+
+    static size_t last_clients = 1; // do disconnection logic on boot
+    static size_t disconnect_time = 0;
+    static size_t ticks;
+
+    size_t clients = pServer->getConnectedCount();
+
+    if(clients == 0 && last_clients != 0) {
+        for(auto &fn: functions) fn->sleep();
+        disconnect_time = millis();
+        bl_left.set_period(500);
+        bl_right.set_period(500);
+        bl_left.restart();
+        bl_right.restart();
+        state = State::RecentlyDisconnected;
+    } else
+    if(clients != 0 && last_clients==0) {
+        state = State::Running;
+        for(auto &fn: functions) fn->wake();
+    }
+
+    last_clients = clients;
+
+    switch(state) {
+    case State::Hibernation: {
+        static size_t last_flash = 0;
+        if(millis() - last_flash > 10000) {
+            bl_left.pin->set(true);
+            bl_right.pin->set(true);
+            delay(50);
+            bl_left.pin->set(false);
+            bl_right.pin->set(false);
+            last_flash = millis();
+        }
+        break;
+    }
+    case State::RecentlyDisconnected:
+        if(millis() - disconnect_time > 10000) {
+            bl_left.set(false);
+            bl_right.set(false);
+            state = State::Hibernation;
+        }
+        break;
+    case State::Running:
+        driver.tick();
+        steering.tick();
+        break;
+    }
+
+    ticks++;
     bl_right.tick();
     bl_left.tick();
-    driver.tick();
 
+    delay(fn::Ticking::PERIOD_MS);
 }

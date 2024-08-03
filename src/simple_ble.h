@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 
+#include "line_processor.h"
 #include "log.h"
 
 static NimBLEServer* pServer;
@@ -15,10 +16,10 @@ static NimBLEServer* pServer;
 #define NRF_UART_CHAR_SIZE 20
 #define NRF_UART_RX_BUFFER_SIZE 128
 
-char rx_buf[NRF_UART_RX_BUFFER_SIZE];
-size_t rx_pos = 0;
-
 extern void process_str(const char* buf, size_t len);
+
+using BLELineProcessor = line_processor::LineProcessor<NRF_UART_RX_BUFFER_SIZE>;
+BLELineProcessor rx(line_processor::callback_t::create<process_str>());
 
 
 /**  None of these are required as they will be handled by the library with defaults. **
@@ -91,20 +92,9 @@ class CharacteristicCallbacks: public NimBLECharacteristicCallbacks {
             char c = in[i];
             if(c == 0) {
                 continue;
-            } else
-            if(c == '\n') {
-                rx_buf[rx_pos] = 0;
-                process_str(rx_buf, rx_pos);
-                rx_pos = 0;
             } else {
-                if(rx_pos<NRF_UART_RX_BUFFER_SIZE) {
-                    rx_buf[rx_pos++] = c;
-                } else {
-                    rx_pos = 0;
-                    logs("Buffer overflow!\n");
-                }
+                rx.add(c);
             }
-
         }
     };
     /** Called before notification or indication is sent,

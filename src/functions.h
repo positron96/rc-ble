@@ -65,7 +65,8 @@ namespace fn {
             }
         }
         void restart() {
-            phase = 0;
+            on = false;
+            set(true);
         }
         void set_period(uint32_t ms) { half_period_ticks = ms_to_ticks(ms)/2; }
         void tick() override {
@@ -89,9 +90,9 @@ namespace fn {
     };
 
     struct Fn {
-        virtual void start() {};
+        virtual void wake() {};
         virtual void set(uint8_t val) = 0;
-        virtual void stop() {};
+        virtual void sleep() {};
     };
 
     constexpr int8_t to_signed(const uint8_t v) {
@@ -114,13 +115,29 @@ namespace fn {
 
         }
 
+        void sleep() override {
+            reverse_lights->set(false);
+            brake_lights->set(false);
+            hbridge->set(0);
+        }
+        void wake() override {
+            reverse_ticks_left = 0;
+            brake_ticks_left = 0;
+        }
+
         void set(uint8_t val) override {
             // TODO: make it act like an actual gas pedal (to zero --> coast, negative -> break)
             int8_t last = value;
             value = to_signed(val);
             hbridge->set(value);
-            if(value < -nonzero_limit) { reverse_lights->set(true); reverse_ticks_left = reverse_delay_ticks;}
-            if (abs(value) < abs(last)) { brake_lights->set(true); brake_ticks_left = brake_delay_ticks; }
+            if(value < -nonzero_limit) {
+                reverse_lights->set(true);
+                reverse_ticks_left = reverse_delay_ticks;
+            }
+            if (abs(value) < abs(last)) {
+                brake_lights->set(true);
+                brake_ticks_left = brake_delay_ticks;
+            }
         }
 
         void tick() override {
@@ -134,6 +151,7 @@ namespace fn {
                 brake_lights->set(false);
             } else brake_ticks_left--;
         }
+
     private:
         int8_t value = 0;
     };
@@ -145,8 +163,18 @@ namespace fn {
         uint8_t nonzero_limit = 20;
         size_t blinker_ticks_left = 0;
         size_t blinker_timeout_ticks = ms_to_ticks(100);
+        static constexpr size_t BlinkerPeriod = 1000;
 
         Steering(Servo *s, Blinker *l, Blinker *r) : servo{s}, left{l}, right{r} {}
+
+        void sleep() override {
+            left->set(false);
+            right->set(false);
+        }
+        void wake() override {
+            left->set_period(BlinkerPeriod);
+            right->set_period(BlinkerPeriod);
+        }
 
         void set(uint8_t val) override {
             servo->set(val);
@@ -187,6 +215,11 @@ namespace fn {
         void set(uint8_t val) override {
             pin->set(val > 127);
         }
+
+        void sleep() override {
+            pin->set(false);
+        }
+
     };
 
 };
