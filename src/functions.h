@@ -118,7 +118,7 @@ namespace fn {
 
     /**
      * A pin that retains its ON state after some time of being switched to OFF.
-     * 
+     *
      * Useful to not make reverse or brake lights too short.
      */
     class DelayedOffPin: public Pin, public DelayedOff {
@@ -128,8 +128,8 @@ namespace fn {
         void set(bool val) { DelayedOff::set(val); if(val) { pin.set(true); } }
         void force_off() { DelayedOff::force_off(); pin.set(false);}
         void tick() {
-            bool was_on = get();            
-            DelayedOff::tick();            
+            bool was_on = get();
+            DelayedOff::tick();
             if(was_on && get()==false) { pin.set(false); }
         }
     };
@@ -159,8 +159,8 @@ namespace fn {
         bool current_fwd;
 
         Driving(Hbridge *hbridge, Pin *rev_lights, Pin *brake_lights):
-            hbridge{hbridge}, 
-            reverse_lights{*rev_lights, 500}, 
+            hbridge{hbridge},
+            reverse_lights{*rev_lights, 500},
             brake_lights{*brake_lights, 500}
         { }
 
@@ -177,23 +177,25 @@ namespace fn {
         }
 
         void set(uint8_t val) override {
-            // TODO: make it act like an actual gas pedal (to zero --> coast, negative -> break)
             current_input = to_signed(val);
             uint8_t abs_input = abs(current_input);
-            bool fwd = abs_input>0;
             if(abs_input < deadzone) {
+                current_input = 0;
+            } else {
+                bool fwd = current_input>0;
                 current_input = (abs_input - deadzone) * 128 / (128 - deadzone);
                 if(!fwd) current_input *= -1;
             }
+            //logf("current_input = %d\n", current_input);
         }
 
         void tick() override {
             int16_t inp = current_input;
-            
+
             // invert input when going backwards,
-            // so positive is always accelerate, 
+            // so positive is always accelerate,
             // negative is brake or change dir
-            if(!current_fwd) inp = -inp; 
+            if(!current_fwd) inp = -inp;
 
             if(output.curr == 0 && inp == 0) has_been_idle = 1;
             else if(output.curr != 0) has_been_idle = 0;
@@ -203,15 +205,15 @@ namespace fn {
                 current_fwd = !current_fwd;
             }
 
-            if(current_input > 0) {
+            if(inp > 0) {
                 // drive
-                output.target = current_input;
-                output.rate = 5;
-            } else 
-            if(current_input == 0) {
+                output.target = inp * 2; // 128 -> 256
+                output.rate = 15;
+            } else
+            if(inp == 0) {
                 // slowly stop
                 output.target = 0;
-                output.rate = 1;
+                output.rate = 5;
             } else {
                 // decelerate
                 output.target = 0;
@@ -221,13 +223,21 @@ namespace fn {
             }
 
             output.tick();
+            if(current_input!=0 || output.curr!=0 || output.target!=0) {
+                logf("in=%d;idle=%d ",
+                    current_input, has_been_idle);
+
+                logf("%c %d -> %d\n",
+                    current_fwd ? '+' : '-',
+                    output.curr, output.target);
+            }
 
             hbridge->set(output.curr, current_fwd);
 
-            if(output.curr < 0) reverse_lights.set(true);
-            
+            if(!current_fwd && output.curr>0) reverse_lights.set(true);
+
             brake_lights.tick();
-            reverse_lights.tick();            
+            reverse_lights.tick();
         }
 
     };
@@ -265,7 +275,7 @@ namespace fn {
             if (value < -light_on_limit) {
                 right->set(true); left->set(false);
                 delay.set();
-            } 
+            }
         }
 
         void tick() override {
