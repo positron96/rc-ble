@@ -35,11 +35,13 @@ namespace fn {
 
 
     struct Hbridge {
-        virtual void set(int8_t val) = 0;
+        virtual void set(uint8_t val, bool fwd) = 0;
     };
 
     struct Pin {
         virtual void set(bool val) = 0;
+        void on() { set(true); }
+        void off() { set(false); }
     };
 
     struct PwmPin: Pin {
@@ -99,68 +101,147 @@ namespace fn {
         return v - 128;
     }
 
+    /**
+     * A pin that retains its ON state after some time of being switched to OFF.
+     * 
+     * Useful to not make reverse or brake lights too short.
+     */
+    class DelayedOffPin: public Pin, public Ticking {
+        size_t ticks_left = 0;
+        const size_t reset_value;
+        Pin &pin;
+    public:
+        DelayedOffPin(Pin &pin, size_t delay_ms): pin{pin}, reset_value{ms_to_ticks(delay_ms)} {}
+        void set(bool val) { if(val) { ticks_left = reset_value; pin.set(true); } }
+        void force_off() { ticks_left=0; pin.set(false);}
+        void tick() {
+            if(ticks_left>0) {
+                ticks_left--;
+                if(ticks_left==0) { pin.set(false); }
+            }
+        }
+    };
+
+    template<class Base>
+    class DelayedOff: public Base {
+        size_t ticks_left = 0;
+        const size_t reset_value;
+    public:
+        DelayedOff(&pin, size_t delay_ms): pin{pin}, reset_value{ms_to_ticks(delay_ms)} {}
+        void set(bool val) { if(val) { ticks_left = reset_value; pin.set(true); } }
+        void force_off() { ticks_left=0; pin.set(false);}
+        void tick() {
+            if(ticks_left>0) {
+                ticks_left--;
+                if(ticks_left==0) { pin.set(false); }
+            }
+        }
+    };
+
+    struct SmoothValue: Ticking {
+        using extl_t = uint8_t;
+        extl_t curr=0, target=0;
+        extl_t rate=1;
+        void reset() { curr=0; target=0; }
+        void tick() override {
+            int16_t err = curr - target;
+            if(err!=0) {
+                if(abs(err) > rate) { curr -= (err>0?1:-1)*rate; } else curr = target;
+            }
+        }
+    };
+
     struct Driving: Fn, Ticking {
         Hbridge *hbridge;
-        Pin *reverse_lights;
-        Pin *brake_lights;
-        size_t reverse_delay_ticks = ms_to_ticks(500);
-        size_t brake_delay_ticks = ms_to_ticks(500);
-        size_t reverse_ticks_left = 0;
-        size_t brake_ticks_left = 0;
-        int8_t nonzero_limit = 10;
+        DelayedOffPin reverse_lights;
+        DelayedOffPin brake_lights;
+        int8_t deadzone = 5;
+        int8_t current_input;
+        uint8_t has_been_idle = 0; ///< used to check if we can go in reverse
 
-        Driving(Hbridge *hbridge, Pin *rev_lights, Pin *brake_lights)
-            : hbridge{hbridge}, reverse_lights{rev_lights}, brake_lights{brake_lights}
-        {
+        SmoothValue output;
+        bool current_fwd;
 
-        }
+        Driving(Hbridge *hbridge, Pin *rev_lights, Pin *brake_lights):
+            hbridge{hbridge}, 
+            reverse_lights{*rev_lights, 500}, 
+            brake_lights{*brake_lights, 500}
+        { }
 
         void sleep() override {
-            reverse_lights->set(false);
-            brake_lights->set(false);
-            hbridge->set(0);
+            reverse_lights.force_off();
+            brake_lights.force_off();
+            hbridge->set(0, true);
         }
         void wake() override {
-            reverse_ticks_left = 0;
-            brake_ticks_left = 0;
+            reverse_lights.force_off();
+            brake_lights.force_off();
+            hbridge->set(0, true);
+            output.reset();
         }
 
         void set(uint8_t val) override {
             // TODO: make it act like an actual gas pedal (to zero --> coast, negative -> break)
-            int8_t last = value;
-            value = to_signed(val);
-            hbridge->set(value);
-            if(value < -nonzero_limit) {
-                reverse_lights->set(true);
-                reverse_ticks_left = reverse_delay_ticks;
-            }
-            if (abs(value) < abs(last)) {
-                brake_lights->set(true);
-                brake_ticks_left = brake_delay_ticks;
+            current_input = to_signed(val);
+            uint8_t abs_input = abs(current_input);
+            bool fwd = abs_input>0;
+            if(abs_input < deadzone) {
+                current_input = (abs_input - deadzone) * 128 / (128 - deadzone);
+                if(!fwd) current_input *= -1;
             }
         }
 
         void tick() override {
-            if(value < -nonzero_limit) reverse_ticks_left = reverse_delay_ticks;
-            else {
-                if(reverse_ticks_left==0) reverse_lights->set(false);
-                else reverse_ticks_left --;
+            int16_t inp = current_input;
+            
+            // invert input when going backwards,
+            // so positive is always accelerate, 
+            // negative is brake or change dir
+            if(!current_fwd) inp = -inp; 
+
+            if(output.curr == 0 && inp == 0) has_been_idle = 1;
+            else if(output.curr != 0) has_been_idle = 0;
+
+            if(has_been_idle && inp < 0) {
+                // only allow reversing when stopped and throttle idle
+                current_fwd = !current_fwd;
             }
 
-            if(brake_ticks_left==0) {
-                brake_lights->set(false);
-            } else brake_ticks_left--;
+            if(current_input > 0) {
+                // drive
+                output.target = current_input;
+                output.rate = 5;
+            } else 
+            if(current_input == 0) {
+                // slowly stop
+                output.target = 0;
+                output.rate = 1;
+            } else {
+                // decelerate
+                output.target = 0;
+                output.rate = 1 + abs(inp)/5;
+                // brake light on
+                brake_lights.set(true);
+            }
+
+            output.tick();
+
+            hbridge->set(output.curr, current_fwd);
+
+            if(output.curr < 0) reverse_lights.set(true);
+            
+            brake_lights.tick();
+            reverse_lights.tick();            
         }
 
-    private:
-        int8_t value = 0;
     };
 
     struct Steering: Fn, Ticking {
         fn::Servo *servo;
         fn::Blinker *left;
         fn::Blinker *right;
-        uint8_t nonzero_limit = 20;
+        uint8_t deadzone = 20;
+        uint8_t light_on_limit = 40;
         size_t blinker_ticks_left = 0;
         size_t blinker_timeout_ticks = ms_to_ticks(100);
         static constexpr size_t BlinkerPeriod = 1000;
@@ -179,11 +260,11 @@ namespace fn {
         void set(uint8_t val) override {
             servo->set(val);
             value = to_signed(val);
-            if (value > nonzero_limit) {
+            if (value > light_on_limit) {
                 left->set(true);
                 right->set(false);
             } else
-            if (value < -nonzero_limit) {
+            if (value < -light_on_limit) {
                 right->set(true);
                 left->set(false);
             } else {

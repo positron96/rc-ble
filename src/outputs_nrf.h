@@ -149,7 +149,7 @@ namespace nrf {
         size_t index;
         HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
 
-        void set(int8_t val) override;
+        void set(uint8_t val, bool fwd) override;
     };
 
     struct PwmPin: fn::PwmPin {
@@ -203,17 +203,17 @@ namespace nrf {
             nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
         }
 
-        void set_hbridge(int8_t val, size_t idx1) {
+        void set_hbridge(uint8_t val, bool fwd, size_t idx1) {
             size_t idx2 = idx1+1;
             if(val==0) { // coast
                 data[idx1] = PWM_ZERO;
                 data[idx2] = PWM_ZERO;
             } else
-            if(val>0) {
+            if(fwd) {
                 data[idx1] = PWM_ZERO;
                 data[idx2] = add_edge(val);
             } else {
-                data[idx1] = add_edge(-val);
+                data[idx1] = add_edge(val);
                 data[idx2] = PWM_ZERO;
             }
             nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
@@ -249,6 +249,6 @@ void nrf::Servo::set_us(uint16_t us) {
     owner->set_us(index, us);
 };
 
-void nrf::HBridge::set(int8_t val) {
-    owner->set_hbridge(val, index);
+void nrf::HBridge:: set(uint8_t val, bool fwd) {
+    owner->set_hbridge(val, fwd, index);
 };
