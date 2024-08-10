@@ -7,6 +7,9 @@
 
 #include <Arduino.h>
 
+#define LOG_UART
+
+#ifdef LOG_UART
 
 void logs(const char* msg) {
     puts(msg);
@@ -27,3 +30,12 @@ void logf(const char * fmt, ...) {
     vlogf(fmt, args);
     va_end(args);
 }
+
+#else
+
+void logs(const char* msg) {}
+void logln(const char* msg) {}
+void vlogf(const char * fmt, va_list args) {}
+void logf(const char * fmt, ...) {}
+
+#endif

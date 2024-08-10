@@ -176,7 +176,6 @@ namespace nrf {
             if(available_pins()<2) return false;
             hbr.index = pins.size();
             hbr.owner = this;
-            //hbridges.push_back(&hbr);
             pins.push_back(hbr.pin1);
             pins.push_back(hbr.pin2);
             return true;

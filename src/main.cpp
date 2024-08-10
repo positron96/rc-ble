@@ -52,12 +52,12 @@ extern "C" void TIMER1_IRQHandler() {
 
 
 void setup() {
-    Serial.setPins(30, 28);
+    Serial.setPins(15, 18);
     Serial.begin(9600);
     Serial.println("\nStarting NimBLE Server");
 
     nrf::PWM pwm;
-    //pwm.add_hbridge(hbridge);
+    pwm.add_hbridge(hbridge);
 
     functions.push_back(&driver);
 
@@ -71,6 +71,7 @@ void setup() {
     functions.push_back(&main_light);
 
     servo_timer.init();
+    pwm.init();
 
     ble_start();
 }
