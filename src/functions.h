@@ -101,40 +101,36 @@ namespace fn {
         return v - 128;
     }
 
+    class DelayedOff: public Ticking {
+        size_t ticks_left = 0;
+        const size_t reset_value;
+    public:
+        DelayedOff(size_t delay_ms): reset_value{ms_to_ticks(delay_ms)} {}
+        void set(bool val = true) { if(val) { ticks_left = reset_value; } }
+        void force_off() { ticks_left=0; }
+        void tick() {
+            if(ticks_left>0) {
+                ticks_left--;
+            }
+        }
+        bool get() { return ticks_left>0; }
+    };
+
     /**
      * A pin that retains its ON state after some time of being switched to OFF.
      * 
      * Useful to not make reverse or brake lights too short.
      */
-    class DelayedOffPin: public Pin, public Ticking {
-        size_t ticks_left = 0;
-        const size_t reset_value;
+    class DelayedOffPin: public Pin, public DelayedOff {
         Pin &pin;
     public:
-        DelayedOffPin(Pin &pin, size_t delay_ms): pin{pin}, reset_value{ms_to_ticks(delay_ms)} {}
-        void set(bool val) { if(val) { ticks_left = reset_value; pin.set(true); } }
-        void force_off() { ticks_left=0; pin.set(false);}
+        DelayedOffPin(Pin &pin, size_t delay_ms): DelayedOff{delay_ms}, pin{pin} {}
+        void set(bool val) { DelayedOff::set(val); if(val) { pin.set(true); } }
+        void force_off() { DelayedOff::force_off(); pin.set(false);}
         void tick() {
-            if(ticks_left>0) {
-                ticks_left--;
-                if(ticks_left==0) { pin.set(false); }
-            }
-        }
-    };
-
-    template<class Base>
-    class DelayedOff: public Base {
-        size_t ticks_left = 0;
-        const size_t reset_value;
-    public:
-        DelayedOff(&pin, size_t delay_ms): pin{pin}, reset_value{ms_to_ticks(delay_ms)} {}
-        void set(bool val) { if(val) { ticks_left = reset_value; pin.set(true); } }
-        void force_off() { ticks_left=0; pin.set(false);}
-        void tick() {
-            if(ticks_left>0) {
-                ticks_left--;
-                if(ticks_left==0) { pin.set(false); }
-            }
+            bool was_on = get();            
+            DelayedOff::tick();            
+            if(was_on && get()==false) { pin.set(false); }
         }
     };
 
@@ -240,13 +236,14 @@ namespace fn {
         fn::Servo *servo;
         fn::Blinker *left;
         fn::Blinker *right;
+        DelayedOff delay;
         uint8_t deadzone = 20;
         uint8_t light_on_limit = 40;
-        size_t blinker_ticks_left = 0;
-        size_t blinker_timeout_ticks = ms_to_ticks(100);
         static constexpr size_t BlinkerPeriod = 1000;
 
-        Steering(Servo *s, Blinker *l, Blinker *r) : servo{s}, left{l}, right{r} {}
+        Steering(Servo *s, Blinker *l, Blinker *r):
+            servo{s}, left{l}, right{r}, delay{100}
+        {}
 
         void sleep() override {
             left->set(false);
@@ -255,34 +252,27 @@ namespace fn {
         void wake() override {
             left->set_period(BlinkerPeriod);
             right->set_period(BlinkerPeriod);
+            delay.force_off();
         }
 
         void set(uint8_t val) override {
             servo->set(val);
             value = to_signed(val);
             if (value > light_on_limit) {
-                left->set(true);
-                right->set(false);
+                left->set(true); right->set(false);
+                delay.set();
             } else
             if (value < -light_on_limit) {
-                right->set(true);
-                left->set(false);
-            } else {
-                left->set(false);
-                right->set(false);
-            }
+                right->set(true); left->set(false);
+                delay.set();
+            } 
         }
 
-        void reset_ticks() { blinker_ticks_left = blinker_timeout_ticks;}
-
         void tick() override {
-            // if(abs(value) > nonzero_limit) reset_ticks();
-            // if(blinker_ticks_left == 0) {
-            //     right->set(false);
-            //     left->set(false);
-            // } else {
-            //     blinker_ticks_left--;
-            // }
+            delay.tick();
+            if(delay.get() == false) { left->set(false); right->set(false); }
+            left->tick();
+            right->tick();
         }
     private:
         int8_t value;
