@@ -110,7 +110,7 @@ namespace nrf {
                 nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
                 NVIC_EnableIRQ(servo_irq);
                 running = true;
-            }
+            } else
             if(running && to_pause) {
                 nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
                 NVIC_DisableIRQ(servo_irq);
