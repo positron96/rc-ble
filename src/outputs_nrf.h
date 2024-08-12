@@ -51,7 +51,10 @@ namespace nrf {
         }
 
         void set_us(size_t idx, uint16_t us) {
-            nrf_timer_cc_set(servo_timer, (nrf_timer_cc_channel_t)idx, us);
+            nrf_timer_cc_channel_t ch = (nrf_timer_cc_channel_t)idx;
+            uint16_t current = nrf_timer_cc_get(servo_timer, ch);
+            if(current == us) return;
+            nrf_timer_cc_set(servo_timer, ch, us);
             //logf("set_us %d\n", us);
             cycles_left = SERVO_CYCLES;
             set_paused(false);

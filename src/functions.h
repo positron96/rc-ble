@@ -85,9 +85,11 @@ namespace fn {
     struct Servo {
         uint16_t center = 1500;
         int16_t half_range = 500;
+        static constexpr uint8_t in_halfrange = 127;
         virtual void set_us(uint16_t val) = 0;
-        void set(uint8_t val) {
-            set_us(center + (val-127)*half_range/127);
+        void set(int8_t val) {
+            // rounded division
+            set_us(center + (val*half_range + in_halfrange/2)/in_halfrange);
         };
     };
 
@@ -97,8 +99,19 @@ namespace fn {
         virtual void sleep() {};
     };
 
-    constexpr int8_t to_signed(const uint8_t v) {
-        return v - 128;
+    constexpr int8_t to_centered(const uint8_t v, const uint8_t deadzone = 0) {
+        constexpr uint8_t center = 128;
+        constexpr uint8_t in_range = 128;
+        const uint8_t out_range = in_range - deadzone;
+        int8_t ret = v - center;
+        if(deadzone != 0) {
+            uint8_t mag = abs(ret);
+            if(mag < deadzone) return 0;
+            // do a rounding division here
+            else return (ret>0?1:-1)*((mag-deadzone)*in_range+ out_range/2)/out_range;
+        } else {
+            return ret;
+        }
     }
 
     class DelayedOff: public Ticking {
@@ -134,13 +147,13 @@ namespace fn {
         }
     };
 
+    template<typename int_t = uint8_t>
     struct SmoothValue: Ticking {
-        using extl_t = uint8_t;
-        extl_t curr=0, target=0;
-        extl_t rate=1;
+        int_t curr=0, target=0;
+        int_t rate=1;
         void reset() { curr=0; target=0; }
         void tick() override {
-            int16_t err = curr - target;
+            int err = curr - target;
             if(err!=0) {
                 if(abs(err) > rate) { curr -= (err>0?1:-1)*rate; } else curr = target;
             }
@@ -151,11 +164,11 @@ namespace fn {
         Hbridge *hbridge;
         DelayedOffPin reverse_lights;
         DelayedOffPin brake_lights;
-        int8_t deadzone = 5;
+        int8_t deadzone = 4;
         int8_t current_input;
         uint8_t has_been_idle = 0; ///< used to check if we can go in reverse
 
-        SmoothValue output;
+        SmoothValue<uint8_t> output;
         bool current_fwd;
 
         Driving(Hbridge *hbridge, Pin *rev_lights, Pin *brake_lights):
@@ -177,15 +190,7 @@ namespace fn {
         }
 
         void set(uint8_t val) override {
-            current_input = to_signed(val);
-            uint8_t abs_input = abs(current_input);
-            if(abs_input < deadzone) {
-                current_input = 0;
-            } else {
-                bool fwd = current_input>0;
-                current_input = (abs_input - deadzone) * 128 / (128 - deadzone);
-                if(!fwd) current_input *= -1;
-            }
+            current_input = to_centered(val, deadzone);
             //logf("current_input = %d\n", current_input);
         }
 
@@ -246,9 +251,8 @@ namespace fn {
         fn::Servo *servo;
         fn::Blinker *left;
         fn::Blinker *right;
-        DelayedOff delay;
-        uint8_t deadzone = 20;
-        uint8_t light_on_limit = 40;
+        uint8_t deadzone = 4;
+        uint8_t light_on_limit = 20;
         static constexpr size_t BlinkerPeriod = 1000;
 
         Steering(Servo *s, Blinker *l, Blinker *r):
@@ -265,27 +269,31 @@ namespace fn {
             delay.force_off();
         }
 
-        void set(uint8_t val) override {
-            servo->set(val);
-            value = to_signed(val);
-            if (value > light_on_limit) {
+        void set(uint8_t val) override {            
+            int8_t centered = to_centered(val, deadzone);
+            value.target = centered;
+            if (centered > light_on_limit) {
                 left->set(true); right->set(false);
                 delay.set();
             } else
-            if (value < -light_on_limit) {
+            if (centered < -light_on_limit) {
                 right->set(true); left->set(false);
                 delay.set();
             }
         }
 
         void tick() override {
+            value.tick();
+            servo->set(value.curr);
+
             delay.tick();
             if(delay.get() == false) { left->set(false); right->set(false); }
             left->tick();
             right->tick();
         }
     private:
-        int8_t value;
+        SmoothValue<int8_t> value;       
+        DelayedOff delay; 
     };
 
     struct Simple: Fn {
