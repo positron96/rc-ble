@@ -26,6 +26,19 @@ namespace fn {
     //     virtual void stop() = 0;
     // };
 
+    /** Rounded division. */
+    template<typename T, typename U, std::enable_if_t<std::is_unsigned_v<U> >* =nullptr >
+    T rdiv(const T x, const U y) {
+        T quot = x / y;
+        T rem = x % y;
+        U ty = y-1;
+        if (x >= 0) {
+            return quot + (rem > (ty/2));
+        } else {
+            return quot - (rem < (-ty/2));
+        }
+    }
+
     struct Ticking {
         static constexpr size_t TICK_FREQ = 50;
         static constexpr size_t PERIOD_MS = 1000 / TICK_FREQ;
@@ -88,8 +101,7 @@ namespace fn {
         static constexpr uint8_t in_halfrange = 127;
         virtual void set_us(uint16_t val) = 0;
         void set(int8_t val) {
-            // rounded division
-            set_us(center + (val*half_range + in_halfrange/2)/in_halfrange);
+            set_us(center + rdiv(val*half_range, in_halfrange));
         };
     };
 
@@ -107,8 +119,7 @@ namespace fn {
         if(deadzone != 0) {
             uint8_t mag = abs(ret);
             if(mag < deadzone) return 0;
-            // do a rounding division here
-            else return (ret>0?1:-1)*((mag-deadzone)*in_range+ out_range/2)/out_range;
+            else return (ret>0?1:-1) * rdiv((mag-deadzone)*in_range, out_range);
         } else {
             return ret;
         }
