@@ -34,7 +34,7 @@ namespace nrf {
     NRF_TIMER_Type *servo_timer = NRF_TIMER1;
     constexpr IRQn_Type servo_irq = TIMER1_IRQn;
 
-    struct ServoTimer {
+    struct ServoTimer: fn::Wakeable {
         static constexpr size_t SERVO_PERIOD = 20000;
         static constexpr size_t MAX_SERVOS = 3;
 
@@ -108,6 +108,30 @@ namespace nrf {
             }
         }
 
+        void wake() { init(); };
+        
+        void sleep() {
+            nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+            nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_CLEAR);
+            nrf_timer_int_disable(servo_timer, NRF_TIMER_INT_COMPARE3_MASK);
+
+            for(size_t i=0; i<servos.size(); i++) {
+                size_t pin = servos[i]->pin;
+                
+                size_t gpiote_ch = i;
+                nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
+
+                nrf_ppi_channel_t ppi_ch_on = ppi_ch(i*2);
+                nrf_ppi_channel_t ppi_ch_off = ppi_ch(i*2+1);  
+
+                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_on);
+                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_off);
+
+                nrf_gpio_cfg_default(pin);
+            }
+        };
+
+        /** Stops/starts timer. */
         void set_paused(bool to_pause) {
             if(!running && !to_pause) {
                 nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
@@ -169,7 +193,7 @@ namespace nrf {
     constexpr uint16_t add_edge(const uint16_t v) { return v | 0x8000; }
     constexpr uint16_t PWM_ZERO = add_edge(0);
 
-    class PWM {
+    class PWM: public fn::Wakeable {
     public:
         static constexpr size_t NUM_PINS = NRF_PWM_CHANNEL_COUNT;
         static constexpr size_t MAX_PWM = 255;
@@ -205,6 +229,12 @@ namespace nrf {
 
             nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
         }
+        
+        void wake() { init(); };
+        
+        void sleep() {
+            nrf_pwm_disable(pwm);
+        };
 
         void set_hbridge(uint8_t val, bool fwd, size_t idx1) {
             size_t idx2 = idx1+1;

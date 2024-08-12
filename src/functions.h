@@ -105,10 +105,13 @@ namespace fn {
         };
     };
 
-    struct Fn {
+    struct Wakeable {
         virtual void wake() {};
-        virtual void set(uint8_t val) = 0;
         virtual void sleep() {};
+    };
+
+    struct Fn: Wakeable {
+        virtual void set(uint8_t val) = 0;
     };
 
     constexpr int8_t to_centered(const uint8_t v, const uint8_t deadzone = 0) {

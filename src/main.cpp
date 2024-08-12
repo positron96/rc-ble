@@ -45,6 +45,7 @@ fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 
 nrf::ServoTimer servo_timer;
+nrf::PWM pwm;
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
@@ -56,7 +57,6 @@ void setup() {
     Serial.begin(9600);
     Serial.println("\nStarting NimBLE Server");
 
-    nrf::PWM pwm;
     pwm.add_hbridge(hbridge);
 
     functions.push_back(&driver);
@@ -70,8 +70,8 @@ void setup() {
 
     functions.push_back(&main_light);
 
-    servo_timer.init();
-    pwm.init();
+    // servo_timer.init();
+    // pwm.init();
 
     ble_start();
 }
@@ -141,11 +141,15 @@ void loop() {
         bl_right.set_period(500);
         bl_left.restart();
         bl_right.restart();
+        servo_timer.sleep();
+        pwm.sleep();
         state = State::RecentlyDisconnected;
     } else
     if(clients != 0 && last_clients==0) {
         state = State::Running;
-        for(auto &fn: functions) fn->wake();
+        servo_timer.wake();
+        pwm.wake();  
+        for(auto &fn: functions) fn->wake();     
     }
 
     last_clients = clients;
