@@ -55,7 +55,7 @@ namespace nrf {
             uint16_t current = nrf_timer_cc_get(servo_timer, ch);
             if(current == us) return;
             nrf_timer_cc_set(servo_timer, ch, us);
-            //logf("set_us %d\n", us);
+            // logf("set_us(%d) %d\n", idx, us);
             cycles_left = SERVO_CYCLES;
             set_paused(false);
         }
@@ -109,7 +109,7 @@ namespace nrf {
         }
 
         void wake() { init(); };
-        
+
         void sleep() {
             nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
             nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_CLEAR);
@@ -117,12 +117,12 @@ namespace nrf {
 
             for(size_t i=0; i<servos.size(); i++) {
                 size_t pin = servos[i]->pin;
-                
+
                 size_t gpiote_ch = i;
                 nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
 
                 nrf_ppi_channel_t ppi_ch_on = ppi_ch(i*2);
-                nrf_ppi_channel_t ppi_ch_off = ppi_ch(i*2+1);  
+                nrf_ppi_channel_t ppi_ch_off = ppi_ch(i*2+1);
 
                 nrf_ppi_channel_enable(NRF_PPI, ppi_ch_on);
                 nrf_ppi_channel_enable(NRF_PPI, ppi_ch_off);
@@ -229,9 +229,9 @@ namespace nrf {
 
             nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
         }
-        
+
         void wake() { init(); };
-        
+
         void sleep() {
             nrf_pwm_disable(pwm);
         };

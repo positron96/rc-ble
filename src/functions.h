@@ -163,8 +163,11 @@ namespace fn {
 
     template<typename int_t = uint8_t>
     struct SmoothValue: Ticking {
-        int_t curr=0, target=0;
-        int_t rate=1;
+        int_t curr, target;
+        int_t rate;
+        SmoothValue(): SmoothValue{1, 0} {}
+        SmoothValue(int_t rate): SmoothValue{rate, 0} {}
+        SmoothValue(int_t rate, int_t value): curr{value}, target{value}, rate{rate} {}
         void reset() { curr=0; target=0; }
         void tick() override {
             int err = curr - target;
@@ -242,14 +245,14 @@ namespace fn {
             }
 
             output.tick();
-            if(current_input!=0 || output.curr!=0 || output.target!=0) {
-                logf("in=%d;idle=%d ",
-                    current_input, has_been_idle);
+            // if(current_input!=0 || output.curr!=0 || output.target!=0) {
+            //     logf("in=%d;idle=%d ",
+            //         current_input, has_been_idle);
 
-                logf("%c %d -> %d\n",
-                    current_fwd ? '+' : '-',
-                    output.curr, output.target);
-            }
+            //     logf("%c %d -> %d\n",
+            //         current_fwd ? '+' : '-',
+            //         output.curr, output.target);
+            // }
 
             hbridge->set(output.curr, current_fwd);
 
@@ -270,7 +273,7 @@ namespace fn {
         static constexpr size_t BlinkerPeriod = 1000;
 
         Steering(Servo *s, Blinker *l, Blinker *r):
-            servo{s}, left{l}, right{r}, delay{100}
+            servo{s}, left{l}, right{r}, value{20}, blinker_delay{100}
         {}
 
         void sleep() override {
@@ -280,34 +283,34 @@ namespace fn {
         void wake() override {
             left->set_period(BlinkerPeriod);
             right->set_period(BlinkerPeriod);
-            delay.force_off();
+            blinker_delay.force_off();
         }
 
-        void set(uint8_t val) override {            
+        void set(uint8_t val) override {
             int8_t centered = to_centered(val, deadzone);
             value.target = centered;
-            if (centered > light_on_limit) {
-                left->set(true); right->set(false);
-                delay.set();
-            } else
-            if (centered < -light_on_limit) {
-                right->set(true); left->set(false);
-                delay.set();
-            }
         }
 
         void tick() override {
             value.tick();
             servo->set(value.curr);
+            if (value.target > light_on_limit) {
+                left->set(true); right->set(false);
+                blinker_delay.set();
+            } else
+            if (value.target < -light_on_limit) {
+                right->set(true); left->set(false);
+                blinker_delay.set();
+            }
 
-            delay.tick();
-            if(delay.get() == false) { left->set(false); right->set(false); }
+            blinker_delay.tick();
+            if(blinker_delay.get() == false) { left->set(false); right->set(false); }
             left->tick();
             right->tick();
         }
     private:
-        SmoothValue<int8_t> value;       
-        DelayedOff delay; 
+        SmoothValue<int8_t> value;
+        DelayedOff blinker_delay;
     };
 
     struct Simple: Fn {
