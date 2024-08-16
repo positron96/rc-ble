@@ -13,12 +13,11 @@
 
 #include "simple_ble.h"
 
-constexpr size_t LED_PIN = 18;
-
 volatile uint8_t val;
 
 etl::vector<fn::Fn*, 10> functions;
 
+constexpr size_t BAT_PIN = 30;
 constexpr size_t D1 = 5;
 constexpr size_t D2 = 6;
 constexpr size_t D3 = 9;
@@ -109,6 +108,24 @@ void process_str(const char* buf, size_t len) {
 
 }
 
+void update_battery() {
+    static size_t last_time=0;
+    constexpr size_t INTERVAL_S = 60;
+    if(millis() - last_time > INTERVAL_S*1000) {
+        last_time = millis();
+
+        uint32_t v = analogRead(BAT_PIN);
+        //logf("got ADC, %d, ", v);
+        v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
+        uint8_t char_data[3] = {0b0100'0000, uint8_t((v>>8) & 0xFF), uint8_t(v & 0xFF)};
+        pBatEnergyChar->setValue(char_data, 3);
+        //logf("%X\n", char_data);
+        v = constrain(v, 3300, 4200);
+        v = map(v, 3300, 4200, 0, 100);
+        pBatChar->setValue<uint8_t>(v);
+    }
+}
+
 enum class State {
     Running, ///< there are connected clients
     RecentlyDisconnected, ///< client disconnected not long ago,
@@ -148,8 +165,8 @@ void loop() {
     if(clients != 0 && last_clients==0) {
         state = State::Running;
         servo_timer.wake();
-        pwm.wake();  
-        for(auto &fn: functions) fn->wake();     
+        pwm.wake();
+        for(auto &fn: functions) fn->wake();
     }
 
     last_clients = clients;
@@ -183,6 +200,8 @@ void loop() {
     ticks++;
     bl_right.tick();
     bl_left.tick();
+
+    update_battery();
 
     delay(fn::Ticking::PERIOD_MS);
 }

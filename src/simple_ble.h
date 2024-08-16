@@ -157,6 +157,7 @@ static DescriptorCallbacks dscCallbacks;
 static CharacteristicCallbacks chrCallbacks;
 
 NimBLECharacteristic* pBatChar;
+NimBLECharacteristic* pBatEnergyChar;
 
 void ble_start() {
     /** sets device name */
@@ -239,10 +240,11 @@ void ble_start() {
 
     constexpr uint16_t BLE_SVC_BAS_UUID16 = 0x180F;
     constexpr uint16_t BLE_SVC_BAS_CHR_UUID16_BATTERY_LEVEL = 0x2A19;
+    constexpr uint16_t BLE_SVC_BAS_CHR_UUID16_ENERGY_STATUS = 0x2BF0;
 
     auto pBatSvc = pServer->createService(BLE_SVC_BAS_UUID16);
     pBatChar = pBatSvc->createCharacteristic(BLE_SVC_BAS_CHR_UUID16_BATTERY_LEVEL, NIMBLE_PROPERTY::READ, 1);
-    pBatChar->setValue<uint8_t>(50);
+    pBatEnergyChar = pBatSvc->createCharacteristic(BLE_SVC_BAS_CHR_UUID16_ENERGY_STATUS, NIMBLE_PROPERTY::READ, 4);
     pBatSvc->start();
 
     NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
