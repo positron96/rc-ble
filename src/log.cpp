@@ -5,7 +5,6 @@
 #include <cstdarg>
 #include <cstdio>
 
-#include <Arduino.h>
 
 #define LOG_UART
 
