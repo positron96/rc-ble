@@ -1,9 +1,5 @@
 #pragma once
 
-#include <NimBLEDevice.h>
-
-#include <Arduino.h>
-
 #include "line_processor.h"
 #include "log.h"
 

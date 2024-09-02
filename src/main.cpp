@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include <nrf_delay.h>
 
 #include <etl/vector.h>
 #include <etl/string_view.h>
@@ -11,7 +11,9 @@
 #include "outputs_nrf.h"
 #include "line_processor.h"
 
-#include "simple_ble.h"
+//#include "simple_ble.h"
+
+#define delay nrf_delay_ms
 
 volatile uint8_t val;
 
@@ -52,16 +54,16 @@ extern "C" void TIMER1_IRQHandler() {
 
 
 void setup() {
-    Serial.setPins(15, 18);
-    Serial.begin(9600);
-    Serial.println("\nStarting NimBLE Server");
+    // Serial.setPins(15, 18);
+    // Serial.begin(9600);
+    // Serial.println("\nStarting NimBLE Server");
 
     pwm.add_hbridge(hbridge);
 
     functions.push_back(&driver);
 
     if(!servo_timer.add_servo(steer_servo)) {
-        Serial.println("servo add err");
+        logln("servo add err");
         while(1){}
     }
 
@@ -72,7 +74,7 @@ void setup() {
     // servo_timer.init();
     // pwm.init();
 
-    ble_start();
+    //ble_start();
 }
 
 
@@ -109,22 +111,24 @@ void process_str(const char* buf, size_t len) {
 }
 
 void update_battery() {
-    static size_t last_time=0;
-    constexpr size_t INTERVAL_S = 60;
-    if(millis() - last_time > INTERVAL_S*1000) {
-        last_time = millis();
+    // static size_t last_time=0;
+    // constexpr size_t INTERVAL_S = 60;
+    // if(millis() - last_time > INTERVAL_S*1000) {
+    //     last_time = millis();
 
-        uint32_t v = analogRead(BAT_PIN);
-        //logf("got ADC, %d, ", v);
-        v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
-        uint8_t char_data[3] = {0b0100'0000, uint8_t((v>>8) & 0xFF), uint8_t(v & 0xFF)};
-        pBatEnergyChar->setValue(char_data, 3);
-        //logf("%X\n", char_data);
-        v = constrain(v, 3300, 4200);
-        v = map(v, 3300, 4200, 0, 100);
-        pBatChar->setValue<uint8_t>(v);
-    }
+    //     uint32_t v = analogRead(BAT_PIN);
+    //     //logf("got ADC, %d, ", v);
+    //     v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
+    //     uint8_t char_data[3] = {0b0100'0000, uint8_t((v>>8) & 0xFF), uint8_t(v & 0xFF)};
+    //     pBatEnergyChar->setValue(char_data, 3);
+    //     //logf("%X\n", char_data);
+    //     v = constrain(v, 3300, 4200);
+    //     v = map(v, 3300, 4200, 0, 100);
+    //     pBatChar->setValue<uint8_t>(v);
+    // }
 }
+
+uint32_t millis() { return 0;}
 
 enum class State {
     Running, ///< there are connected clients
@@ -138,10 +142,9 @@ void loop() {
     //static uint32_t last_t;
     //int voltage = analogRead(30);
 
-
-    if(Serial.available()) {
-        while(Serial.available()>0) {serial_rx.add(Serial.read());}
-    }
+    // if(Serial.available()) {
+    //     while(Serial.available()>0) {serial_rx.add(Serial.read());}
+    // }
 
     static State state = State::RecentlyDisconnected;
 
@@ -149,7 +152,7 @@ void loop() {
     static size_t disconnect_time = 0;
     static size_t ticks;
 
-    size_t clients = pServer->getConnectedCount();
+    size_t clients = 0;//pServer->getConnectedCount();
 
     if(clients == 0 && last_clients != 0) {
         for(auto &fn: functions) fn->sleep();
@@ -204,4 +207,10 @@ void loop() {
     update_battery();
 
     delay(fn::Ticking::PERIOD_MS);
+}
+
+int main() {
+    setup();
+    while(1) { loop(); }
+    return 0;
 }

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <nordic/nrfx/hal/nrf_timer.h>
-#include <nordic/nrfx/hal/nrf_gpio.h>
-#include <nordic/nrfx/hal/nrf_gpiote.h>
-#include <nordic/nrfx/hal/nrf_ppi.h>
-#include <nordic/nrfx/hal/nrf_pwm.h>
+#include <nrf_timer.h>
+#include <nrf_gpio.h>
+#include <nrf_gpiote.h>
+#include <nrf_ppi.h>
+#include <nrf_pwm.h>
 
 #include <etl/vector.h>
 #include <etl/array.h>
@@ -52,9 +52,9 @@ namespace nrf {
 
         void set_us(size_t idx, uint16_t us) {
             nrf_timer_cc_channel_t ch = (nrf_timer_cc_channel_t)idx;
-            uint16_t current = nrf_timer_cc_get(servo_timer, ch);
+            uint16_t current = nrf_timer_cc_read(servo_timer, ch);
             if(current == us) return;
-            nrf_timer_cc_set(servo_timer, ch, us);
+            nrf_timer_cc_write(servo_timer, ch, us);
             // logf("set_us(%d) %d\n", idx, us);
             cycles_left = SERVO_CYCLES;
             set_paused(false);
@@ -72,7 +72,7 @@ namespace nrf {
 
             nrf_timer_shorts_enable(servo_timer, NRF_TIMER_SHORT_COMPARE3_CLEAR_MASK);
 
-            nrf_timer_cc_set(servo_timer, NRF_TIMER_CC_CHANNEL3, SERVO_PERIOD);
+            nrf_timer_cc_write(servo_timer, NRF_TIMER_CC_CHANNEL3, SERVO_PERIOD);
 
             for(size_t i=0; i<servos.size(); i++) {
                 size_t pin = servos[i]->pin;
@@ -82,29 +82,29 @@ namespace nrf {
                 nrf_ppi_channel_t ppi_ch_on = ppi_ch(i*2);
                 nrf_ppi_channel_t ppi_ch_off = ppi_ch(i*2+1);
 
-                nrf_gpiote_task_configure(NRF_GPIOTE, gpiote_ch,
+                nrf_gpiote_task_configure(gpiote_ch,
                     pin, NRF_GPIOTE_POLARITY_TOGGLE, NRF_GPIOTE_INITIAL_VALUE_LOW
                 );
-                nrf_gpiote_task_enable(NRF_GPIOTE, gpiote_ch);
+                nrf_gpiote_task_enable(gpiote_ch);
                 nrf_ppi_channel_endpoint_setup(
-                    NRF_PPI, ppi_ch_on,
+                    ppi_ch_on,
                     //(uint32_t)&servo_timer->EVENTS_COMPARE[i],
                     //(uint32_t)&NRF_GPIOTE->TASKS_CLR[gpiote_ch]
-                    nrf_timer_event_address_get(
-                        servo_timer, nrf_timer_compare_event_get(i)),
-                    nrf_gpiote_task_address_get(
-                        NRF_GPIOTE, nrf_gpiote_clr_task_get(gpiote_ch))
+                    (uint32_t)nrf_timer_event_address_get(
+                        servo_timer,  nrf_timer_compare_event_get(i)),
+                    nrf_gpiote_task_addr_get(
+                        nrf_gpiote_clr_task_get(gpiote_ch))
                 );
-                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_on);
+                nrf_ppi_channel_enable(ppi_ch_on);
 
                 nrf_ppi_channel_endpoint_setup(
-                    NRF_PPI, ppi_ch_off,
-                    nrf_timer_event_address_get(servo_timer, NRF_TIMER_EVENT_COMPARE3),
+                    ppi_ch_off,
+                    (uint32_t)nrf_timer_event_address_get(servo_timer, NRF_TIMER_EVENT_COMPARE3),
                     //(uint32_t)&NRF_GPIOTE->TASKS_SET[gpiote_ch]
-                    nrf_gpiote_task_address_get(
-                        NRF_GPIOTE, nrf_gpiote_set_task_get(gpiote_ch))
+                    nrf_gpiote_task_addr_get(
+                        nrf_gpiote_set_task_get(gpiote_ch))
                 );
-                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_off);
+                nrf_ppi_channel_enable(ppi_ch_off);
             }
         }
 
@@ -119,13 +119,13 @@ namespace nrf {
                 size_t pin = servos[i]->pin;
 
                 size_t gpiote_ch = i;
-                nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
 
+                nrf_gpiote_task_disable(gpiote_ch);
                 nrf_ppi_channel_t ppi_ch_on = ppi_ch(i*2);
                 nrf_ppi_channel_t ppi_ch_off = ppi_ch(i*2+1);
 
-                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_on);
-                nrf_ppi_channel_enable(NRF_PPI, ppi_ch_off);
+                nrf_ppi_channel_enable(ppi_ch_on);
+                nrf_ppi_channel_enable(ppi_ch_off);
 
                 nrf_gpio_cfg_default(pin);
             }
