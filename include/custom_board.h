@@ -32,6 +32,9 @@ extern "C" {
 
 #define BUTTONS_ACTIVE_STATE 0
 
+#define RX_PIN_NUMBER  15
+#define TX_PIN_NUMBER  18
+
 #define HWFC           true
 
 
