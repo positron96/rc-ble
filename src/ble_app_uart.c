@@ -69,6 +69,8 @@
 #include "bsp_btn_ble.h"
 #include "nrf_pwr_mgmt.h"
 
+#include <nrf_bootloader_info.h>
+
 #if defined (UART_PRESENT)
 #include "nrf_uart.h"
 #endif
@@ -185,6 +187,19 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 }
 
 
+__attribute__((noreturn))
+void reboot_to_bootloader() {
+    NRF_LOG_INFO("Rebooting to bootloader");
+    NRF_LOG_FLUSH();
+    uint32_t err_code;
+    err_code = sd_power_gpregret_clr(0, 0xffffffff);
+    APP_ERROR_CHECK(err_code);
+    err_code = sd_power_gpregret_set(0, BOOTLOADER_DFU_START);
+    APP_ERROR_CHECK(err_code);
+    nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_DFU);
+    __builtin_unreachable();
+}
+
 /**@brief Function for handling the data from the Nordic UART Service.
  *
  * @details This function will process the data received from the Nordic UART BLE Service and send
@@ -212,6 +227,9 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
                 {
                     NRF_LOG_ERROR("Failed receiving NUS message. Error 0x%x. ", err_code);
                     APP_ERROR_CHECK(err_code);
+                }
+                if(p_evt->params.rx_data.p_data[i] == '!') {
+                    reboot_to_bootloader();
                 }
             } while (err_code == NRF_ERROR_BUSY);
         }
