@@ -15,6 +15,8 @@
 #include "app_timer.h"
 
 #include <nrf_log.h>
+#include <nrf_log_ctrl.h>
+#include "nrf_log_default_backends.h"
 
 
 #include "line_processor.h"
@@ -36,7 +38,6 @@
 #define APP_BLE_OBSERVER_PRIO           3                                           /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
 #define APP_ADV_INTERVAL                MSEC_TO_UNITS(50, UNIT_0_625_MS)            /**< The advertising interval (in units of 0.625 ms) */
-
 #define APP_ADV_DURATION                MSEC_TO_UNITS(60000, UNIT_10_MS)              /**< The advertising duration in units of 10 milliseconds. */
 
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
@@ -52,7 +53,7 @@
 
 
 BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);                                   /**< BLE NUS service instance. */
-NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
+NRF_BLE_GATT_DEF(m_gatt);
 BLE_ADVERTISING_DEF(m_advertising);                                                 /**< Advertising module instance. */
 
 static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
@@ -61,9 +62,14 @@ static ble_uuid_t m_adv_uuids[]          = {
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 };
 
+// void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name) {
+//     logf("!! Err %d %s:%d", error_code, p_file_name, line_num);
+//     while(1){ }
+// }
+
 
 size_t get_connected_clients_count() {
-    return m_conn_handle == BLE_CONN_HANDLE_INVALID ? 1 : 0;
+    return m_conn_handle == BLE_CONN_HANDLE_INVALID ? 0 : 1;
 }
 
 
@@ -90,12 +96,9 @@ static void nus_data_handler(ble_nus_evt_t * p_evt) {
 static void services_init(void)  {
     uint32_t           err_code;
     ble_nus_init_t     nus_init;
-
     // Initialize NUS.
     memset(&nus_init, 0, sizeof(nus_init));
-
     nus_init.data_handler = nus_data_handler;
-
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
 }
@@ -178,12 +181,12 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context) {
                 NRF_LOG_DEBUG("PHY update request.");
                 const ble_gap_phys_t phys = {
                     .tx_phys = BLE_GAP_PHY_AUTO,
-                    .rx_phys = BLE_GAP_PHY_AUTO,                
+                    .rx_phys = BLE_GAP_PHY_AUTO,
                 };
                 err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
                 APP_ERROR_CHECK(err_code);
                 break;
-            } 
+            }
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
             // Pairing not supported
@@ -314,6 +317,13 @@ static void advertising_init(void) {
 
 
 void ble_start() {
+    ret_code_t err_code;
+    err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+
+    NRF_LOG_INFO("Starting BLE");
+    logln("Starting BLE/mylog");
 
     ble_stack_init();
     gap_params_init();
@@ -323,6 +333,6 @@ void ble_start() {
     conn_params_init();
 
     NRF_LOG_INFO("Debug logging for UART over RTT started.");
-    uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+    err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
 }

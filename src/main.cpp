@@ -64,7 +64,9 @@ uint32_t millis(void) {
 void setup() {
     // Serial.setPins(15, 18);
     // Serial.begin(9600);
-    // Serial.println("\nStarting NimBLE Server");
+    app_timer_init();
+    app_timer_resume();
+    logln("\nStarting");
 
     pwm.add_hbridge(hbridge);
 
@@ -87,9 +89,9 @@ void setup() {
 
 
 void process_str(const char* buf, size_t len) {
-    //logf("processing '%s'(%d)\n", buf, len);
+    logf("processing '%s'(%d)\n", buf, len);
     etl::string_view in{buf, len};
-    if (in.compare("!")) {
+    if (in.compare("!") == 0) {
         reboot_to_bootloader();
         return;
     }
