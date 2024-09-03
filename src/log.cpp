@@ -5,7 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-
+#define LOG_RTT
 #define LOG_UART_
 
 #ifdef LOG_UART
@@ -28,6 +28,29 @@ void logf(const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vlogf(fmt, args);
+    va_end(args);
+}
+
+#elif defined(LOG_RTT)
+
+#include "SEGGER_RTT.h"
+
+
+void logs(const char* msg) {
+    SEGGER_RTT_WriteString(0, msg);
+}
+
+void logln(const char* msg) {
+    SEGGER_RTT_WriteString(0, msg);
+    SEGGER_RTT_PutChar(0, '\n');
+}
+
+extern "C" int SEGGER_RTT_vprintf(unsigned , const char *, va_list *);
+
+void logf(const char * fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SEGGER_RTT_vprintf(0, fmt, &args);
     va_end(args);
 }
 
