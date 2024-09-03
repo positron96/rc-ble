@@ -1,5 +1,7 @@
 #include <nrf_delay.h>
 
+#include <app_timer.h>
+
 #include <etl/vector.h>
 #include <etl/string_view.h>
 #include <etl/optional.h>
@@ -11,7 +13,8 @@
 #include "outputs_nrf.h"
 #include "line_processor.h"
 
-//#include "simple_ble.h"
+#include "simple_ble.h"
+#include "bootloader.h"
 
 #define delay nrf_delay_ms
 
@@ -53,6 +56,11 @@ extern "C" void TIMER1_IRQHandler() {
 };
 
 
+uint32_t millis(void) {
+    return app_timer_cnt_get() * 1000 / 32768;
+}
+
+
 void setup() {
     // Serial.setPins(15, 18);
     // Serial.begin(9600);
@@ -74,13 +82,17 @@ void setup() {
     // servo_timer.init();
     // pwm.init();
 
-    //ble_start();
+    ble_start();
 }
 
 
 void process_str(const char* buf, size_t len) {
     //logf("processing '%s'(%d)\n", buf, len);
     etl::string_view in{buf, len};
+    if (in.compare("!")) {
+        reboot_to_bootloader();
+        return;
+    }
     etl::optional<etl::string_view> token;
     token = etl::get_token(in, "=", token, true);
     if(!token) {
@@ -128,7 +140,6 @@ void update_battery() {
     // }
 }
 
-uint32_t millis() { return 0;}
 
 enum class State {
     Running, ///< there are connected clients
@@ -152,7 +163,7 @@ void loop() {
     static size_t disconnect_time = 0;
     static size_t ticks;
 
-    size_t clients = 0;//pServer->getConnectedCount();
+    size_t clients = get_connected_clients_count();
 
     if(clients == 0 && last_clients != 0) {
         for(auto &fn: functions) fn->sleep();
