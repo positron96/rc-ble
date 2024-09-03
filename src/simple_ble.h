@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "nordic_common.h"
 #include "nrf.h"
-#include "ble_hci.h"
+
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_params.h"
@@ -11,12 +11,10 @@
 #include "nrf_sdh_soc.h"
 #include "nrf_sdh_ble.h"
 #include "nrf_ble_gatt.h"
-#include "nrf_ble_qwr.h"
 #include "ble_nus.h"
 #include "app_timer.h"
 
 #include <nrf_log.h>
-#include <nrf_log_ctrl.h>
 
 
 #include "line_processor.h"
@@ -27,7 +25,7 @@
 // #define NRF_UART_RX_CHAR_UUID  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 // #define NRF_UART_TX_CHAR_UUID  "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 // #define NRF_UART_CHAR_SIZE 20
-// #define NRF_UART_RX_BUFFER_SIZE 128
+#define NRF_UART_RX_BUFFER_SIZE 128
 
 
 #define APP_BLE_CONN_CFG_TAG            1                                           /**< A tag identifying the SoftDevice BLE configuration. */
@@ -55,7 +53,6 @@
 
 BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);                                   /**< BLE NUS service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
-NRF_BLE_QWR_DEF(m_qwr);                                                             /**< Context for the Queued Write module.*/
 BLE_ADVERTISING_DEF(m_advertising);                                                 /**< Advertising module instance. */
 
 static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
@@ -89,21 +86,10 @@ static void nus_data_handler(ble_nus_evt_t * p_evt) {
     }
 }
 
-static void nrf_qwr_error_handler(uint32_t nrf_error) {
-    APP_ERROR_HANDLER(nrf_error);
-}
-
 
 static void services_init(void)  {
     uint32_t           err_code;
     ble_nus_init_t     nus_init;
-    nrf_ble_qwr_init_t qwr_init = {0};
-
-    // Initialize Queued Write Module.
-    qwr_init.error_handler = nrf_qwr_error_handler;
-
-    err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
-    APP_ERROR_CHECK(err_code);
 
     // Initialize NUS.
     memset(&nus_init, 0, sizeof(nus_init));
@@ -180,8 +166,6 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context) {
             // err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             // APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
-            APP_ERROR_CHECK(err_code);
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -190,16 +174,16 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context) {
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
 
-        case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
-        {
-            NRF_LOG_DEBUG("PHY update request.");
-            ble_gap_phys_t const phys = {
-                .tx_phys = BLE_GAP_PHY_AUTO,
-                .rx_phys = BLE_GAP_PHY_AUTO,                
-            };
-            err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
-            APP_ERROR_CHECK(err_code);
-        } break;
+        case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
+                NRF_LOG_DEBUG("PHY update request.");
+                const ble_gap_phys_t phys = {
+                    .tx_phys = BLE_GAP_PHY_AUTO,
+                    .rx_phys = BLE_GAP_PHY_AUTO,                
+                };
+                err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
+                APP_ERROR_CHECK(err_code);
+                break;
+            } 
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
             // Pairing not supported

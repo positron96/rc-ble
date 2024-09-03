@@ -6,12 +6,13 @@
 #include <cstdio>
 
 
-#define LOG_UART
+#define LOG_UART_
 
 #ifdef LOG_UART
 
 void logs(const char* msg) {
     puts(msg);
+
 }
 
 void logln(const char* msg) {
