@@ -87,7 +87,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt) {
 
         for (uint32_t i = 0; i < p_evt->params.rx_data.length; i++) {
             char ch = (char)p_evt->params.rx_data.p_data[i];
-            rx.add(ch);
+            if(ch!=0) rx.add(ch);
         }
     }
 }

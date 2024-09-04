@@ -82,7 +82,7 @@ void setup() {
 
 
 void process_str(const char* buf, size_t len) {
-    logf("processing '%s'(%d)\n", buf, len);
+    //logf("processing '%s'(%d)\n", buf, len);
     etl::string_view in{buf, len};
     if (in.compare("!") == 0) {
         reboot_to_bootloader();
@@ -183,7 +183,7 @@ void loop() {
         if(millis() - last_flash > 10000) {
             bl_left.pin->set(true);
             bl_right.pin->set(true);
-            delay(50);
+            delay(10);
             bl_left.pin->set(false);
             bl_right.pin->set(false);
             last_flash = millis();
@@ -221,6 +221,7 @@ void timer_tick(void * p_context) {
 }
 
 int main() {
+    log_init();
     logln("\nStarting");
     app_timer_init();
 
