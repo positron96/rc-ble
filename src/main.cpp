@@ -55,19 +55,12 @@ extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
 };
 
-
 uint32_t millis(void) {
     return app_timer_cnt_get() * 1000 / 32768;
 }
 
 
 void setup() {
-    // Serial.setPins(15, 18);
-    // Serial.begin(9600);
-    app_timer_init();
-    app_timer_resume();
-    logln("\nStarting");
-
     pwm.add_hbridge(hbridge);
 
     functions.push_back(&driver);
@@ -81,8 +74,8 @@ void setup() {
 
     functions.push_back(&main_light);
 
-    // servo_timer.init();
-    // pwm.init();
+    servo_timer.init();
+    pwm.init();
 
     ble_start();
 }
@@ -152,9 +145,6 @@ enum class State {
 line_processor::LineProcessor<> serial_rx(line_processor::callback_t::create<process_str>());
 
 void loop() {
-    //static uint32_t last_t;
-    //int voltage = analogRead(30);
-
     // if(Serial.available()) {
     //     while(Serial.available()>0) {serial_rx.add(Serial.read());}
     // }
@@ -218,12 +208,31 @@ void loop() {
     bl_left.tick();
 
     update_battery();
+}
 
-    delay(fn::Ticking::PERIOD_MS);
+// void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
+//     logf("ERROR %d %s:%d\n", err, filename, line);
+// }
+
+APP_TIMER_DEF(m_tick_timer_id);
+
+void timer_tick(void * p_context) {
+    loop();
 }
 
 int main() {
+    logln("\nStarting");
+    app_timer_init();
+
     setup();
-    while(1) { loop(); }
+
+    uint32_t err_code;
+    err_code = app_timer_create(&m_tick_timer_id, APP_TIMER_MODE_REPEATED, timer_tick);
+    APP_ERROR_CHECK(err_code);
+    app_timer_start(m_tick_timer_id, APP_TIMER_TICKS(fn::Ticking::PERIOD_MS), nullptr);
+
+    while(1) {
+        nrf_pwr_mgmt_run();
+    }
     return 0;
 }
