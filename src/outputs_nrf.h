@@ -108,7 +108,7 @@ namespace nrf {
             }
         }
 
-        void wake() { init(); };
+        void wake() { init(); }
 
         void sleep() {
             nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
@@ -128,23 +128,6 @@ namespace nrf {
                 nrf_ppi_channel_enable(ppi_ch_off);
 
                 nrf_gpio_cfg_default(pin);
-            }
-        };
-
-        /** Stops/starts timer. */
-        void set_paused(bool to_pause) {
-            if(!running && !to_pause) {
-                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
-                NVIC_EnableIRQ(servo_irq);
-                running = true;
-            } else
-            if(running && to_pause) {
-                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
-                NVIC_DisableIRQ(servo_irq);
-                running = false;
-                // release GPIO to that it can be controlled with GPIO
-                //nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
-
             }
         }
 
@@ -166,6 +149,27 @@ namespace nrf {
 
         constexpr nrf_ppi_channel_t ppi_ch(size_t i) {
             return nrf_ppi_channel_t(size_t(PPI_FIRST_CH) + i);
+        }
+
+        /**
+         * Stops/starts timer.
+         * Call set_pause(false) only from isr,
+         * otherwise GPIOs can be in unpredictable state.
+         */
+        void set_paused(bool to_pause) {
+            if(!running && !to_pause) {
+                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_START);
+                NVIC_EnableIRQ(servo_irq);
+                running = true;
+            } else
+            if(running && to_pause) {
+                nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
+                NVIC_DisableIRQ(servo_irq);
+                running = false;
+                // release GPIO to that it can be controlled with GPIO
+                //nrf_gpiote_task_disable(NRF_GPIOTE, gpiote_ch);
+
+            }
         }
     };
 

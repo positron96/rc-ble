@@ -96,15 +96,21 @@ namespace fn {
     };
 
     struct Servo {
-        uint16_t center = 1500;
+        uint16_t center_us = 1500;
         int16_t half_range = 500;
+        int8_t val = 127;
         bool inverted = false;
         static constexpr uint8_t in_halfrange = 127;
         virtual void set_us(uint16_t val) = 0;
         void set(int8_t val) {
+            this->val = val;
             if(inverted) val = -val;
-            set_us(center + rdiv(val*half_range, in_halfrange));
+            set_us(center_us + rdiv(val*half_range, in_halfrange));
         };
+        void set_center_us(uint16_t v) {
+            center_us = v;
+            set(this->val);
+        }
     };
 
     struct Wakeable {
@@ -167,9 +173,7 @@ namespace fn {
     struct SmoothValue: Ticking {
         int_t curr, target;
         int_t rate;
-        SmoothValue(): SmoothValue{1, 0} {}
-        SmoothValue(int_t rate): SmoothValue{rate, 0} {}
-        SmoothValue(int_t rate, int_t value): curr{value}, target{value}, rate{rate} {}
+        SmoothValue(int_t rate = 1, int_t value = 0): curr{value}, target{value}, rate{rate} {}
         void reset() { curr=0; target=0; }
         void tick() override {
             int err = curr - target;
@@ -275,7 +279,7 @@ namespace fn {
         static constexpr size_t BlinkerPeriod = 1000;
 
         Steering(Servo *s, Blinker *l, Blinker *r):
-            servo{s}, left{l}, right{r}, value{20}, blinker_delay{100}
+            servo{s}, left{l}, right{r}, value{10}, blinker_delay{100}
         {}
 
         void sleep() override {

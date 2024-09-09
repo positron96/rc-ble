@@ -7,6 +7,7 @@
 #include <etl/optional.h>
 #include <etl/to_arithmetic.h>
 #include <etl/string_utilities.h>
+#include <etl/expected.h>
 
 
 #include "functions.h"
@@ -84,12 +85,32 @@ void setup() {
     ble_start();
 }
 
+template<typename T = uint8_t>
+etl::expected<T, etl::to_arithmetic_status> parse(const etl::string_view &str) {
+    auto data = etl::trim_view_whitespace(str);
+    const auto val = etl::to_arithmetic<T>(data);
+    if(val.has_value()) return val.value();
+    return etl::unexpected(val.error());
+}
+
 
 void process_str(const char* buf, size_t len) {
-    //logf("processing '%s'(%d)\n", buf, len);
+    // logf("processing '%s'(%d)\n", buf, len);
     etl::string_view in{buf, len};
-    if (in.compare("!dfu") == 0) {
-        reboot_to_bootloader();
+    if(in.starts_with("!")) {
+        if (in.compare("!dfu") == 0) {
+            reboot_to_bootloader();
+            return;
+        }
+        if(in.starts_with("!trim_steer=")) {
+            auto val = parse<uint16_t>(in.substr(12));
+            if(val.has_value()) {
+                logf("trim %d\n", val.value());
+                steer_servo.set_center_us(val.value());
+            } else {
+                logf("parse error '%s': %s\n", in, val.error().c_str());
+            }
+        }
         return;
     }
     etl::optional<etl::string_view> token;
@@ -98,8 +119,7 @@ void process_str(const char* buf, size_t len) {
         logf("no ch: '%s'\n", buf);
         return;
     }
-    auto data = etl::trim_view_whitespace(token.value());
-    const auto ch_num = etl::to_arithmetic<int8_t>(data);
+    const auto ch_num = parse(token.value());
     if(!ch_num.has_value()) {
         logf("ch parsing failed: '%s'\n", buf);
         return;
@@ -110,8 +130,8 @@ void process_str(const char* buf, size_t len) {
         logf("no val: '%s'\n", buf);
         return;
     }
-    data = etl::trim_view_whitespace(token.value()) ;
-    const auto val = etl::to_arithmetic<uint8_t>(data);
+
+    const auto val = parse(token.value());
     if(!val.has_value()) {
         logf("val parsing failed: '%s'\n", buf);
         return;
