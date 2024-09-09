@@ -40,6 +40,7 @@ nrf::Pin pin_light_right{D6};
 nrf::Pin pin_light_main{D1};
 nrf::Pin pin_light_brake{D2};
 nrf::Pin pin_light_reverse{D3};
+nrf::Pin pin_light_marker{D4};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
@@ -47,6 +48,7 @@ fn::Blinker bl_right{&pin_light_right};
 fn::Driving driver{&hbridge, &pin_light_reverse, &pin_light_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
+fn::Simple marker_light{&pin_light_marker};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
@@ -65,14 +67,16 @@ void setup() {
 
     functions.push_back(&driver);
 
+    steer_servo.inverted = true;
+
     if(!servo_timer.add_servo(steer_servo)) {
         logln("servo add err");
         while(1){}
     }
 
     functions.push_back(&steering);
-
     functions.push_back(&main_light);
+    functions.push_back(&marker_light);
 
     servo_timer.init();
     pwm.init();
@@ -84,7 +88,7 @@ void setup() {
 void process_str(const char* buf, size_t len) {
     //logf("processing '%s'(%d)\n", buf, len);
     etl::string_view in{buf, len};
-    if (in.compare("!") == 0) {
+    if (in.compare("!dfu") == 0) {
         reboot_to_bootloader();
         return;
     }

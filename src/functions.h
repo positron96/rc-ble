@@ -98,9 +98,11 @@ namespace fn {
     struct Servo {
         uint16_t center = 1500;
         int16_t half_range = 500;
+        bool inverted = false;
         static constexpr uint8_t in_halfrange = 127;
         virtual void set_us(uint16_t val) = 0;
         void set(int8_t val) {
+            if(inverted) val = -val;
             set_us(center + rdiv(val*half_range, in_halfrange));
         };
     };
