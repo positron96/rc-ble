@@ -47,7 +47,7 @@ nrf::Pin pin_light_marker_side{D4};
 
 fn::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(128)};
+fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32)};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
@@ -71,6 +71,7 @@ uint32_t millis(void) {
 
 void setup() {
     pwm.add_hbridge(hbridge);
+    pwm.add_pin(pin_light_rear_red);
 
     functions.push_back(&driver);
 

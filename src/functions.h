@@ -358,6 +358,7 @@ namespace fn {
 
             void set(bool val) override {
                 this->on = val;
+                //logf("set(%d), pwm=%d\n", val, pwm);
                 parent.refresh();
             };
         };
@@ -367,13 +368,13 @@ namespace fn {
             uint8_t max_pwm = 0;
             for(auto &p: pins) {
                 if(p.on && p.pwm > max_pwm) max_pwm = p.pwm;
-                output->set(max_pwm);
+                output->set_pwm(max_pwm);
             }
         }
     public:
         MultiInputPin(BaseAnalogPin *output): output{output} {}
 
-        BasePin* create_pin(int8_t pwm) {
+        BasePin* create_pin(uint8_t pwm) {
             if(pins.available()==0) return nullptr;
             return &pins.emplace_back(*this, pwm);
         }
