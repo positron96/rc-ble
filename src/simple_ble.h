@@ -364,7 +364,32 @@ void ble_start() {
     advertising_init();
     conn_params_init();
 
-    NRF_LOG_INFO("Debug logging for UART over RTT started.");
     err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_INFO("BLE started");
 }
+
+static void on_error(void) {
+#ifdef DEBUG
+    NRF_BREAKPOINT_COND;
+#endif
+    NVIC_SystemReset();
+}
+
+
+void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name) {
+    logf("error err_code:%d %s:%d\n", error_code, p_file_name, line_num);
+    on_error();
+}
+
+void app_error_handler_bare(uint32_t error_code) {
+    logf("error_bare: 0x%08x!\n", error_code);
+    on_error();
+}
+
+void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+    logf("fault 0x%08x, pc: 0x%08x, info: 0x%08x\n", id, pc, info);
+    on_error();
+}
+
