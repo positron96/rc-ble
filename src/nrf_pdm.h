@@ -9,6 +9,7 @@
 
 #include <nrf_gpio.h>
 
+// # original pseudocode (and below) has values 20 and 32 swapped by mistake
 // P = 20     # Number of interrupts in a PWM period where the output is 1.
 // T = 32     # Number of interrupts in a PWM period.
 // h2 = T
@@ -37,7 +38,7 @@ namespace nrf {
         uint8_t t;
         uint8_t h2;
     public:
-        PdmPin(size_t pin): pin{pin}, t{0}, h2{P} {
+        PdmPin(size_t pin): pin{pin}, t{0}, h2{0} {
             nrf_gpio_cfg_output(pin);
         }
 
@@ -46,12 +47,12 @@ namespace nrf {
         };
 
         void tick() {
-            if (h2 < P) {
+            if (h2 < t) {
                 nrf_gpio_pin_write(pin, 1);
-                h2 += t - P;
+                h2 += P - t;
             } else {
                 nrf_gpio_pin_write(pin, 0);
-                h2 -= P;
+                h2 -= t;
             }
         }
 

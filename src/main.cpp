@@ -13,6 +13,7 @@
 
 #include "functions.h"
 #include "outputs_nrf.h"
+#include "nrf_pdm.h"
 #include "line_processor.h"
 #include "battery.h"
 #include "simple_ble.h"
@@ -41,6 +42,8 @@ nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left{D5};
 nrf::Pin pin_light_right{D6};
 nrf::Pin pin_light_main{D1};
+//nrf::PdmPin pin_light_main{D1};
+
 nrf::PwmPin pin_light_rear_red{D2};
 nrf::Pin pin_light_reverse{D3};
 nrf::Pin pin_light_marker_side{D4};
@@ -248,12 +251,16 @@ void loop() {
 // }
 
 APP_TIMER_DEF(m_tick_timer);
-
 APP_TIMER_DEF(m_battery_timer);
+APP_TIMER_DEF(m_pdm_timer);
 
 void timer_tick(void * p_context) {
     loop();
 }
+
+// void update_pdm(void * ctx) {
+//     pin_light_main.tick();
+// }
 
 int main() {
     log_init();
@@ -271,6 +278,10 @@ int main() {
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
     app_timer_start(m_battery_timer, APP_TIMER_TICKS(15000), nullptr);
+
+    // err_code = app_timer_create(&m_pdm_timer, APP_TIMER_MODE_REPEATED, update_pdm);
+    // APP_ERROR_CHECK(err_code);
+    // app_timer_start(m_pdm_timer, APP_TIMER_TICKS(1), nullptr);
 
     while(1) {
         nrf_pwr_mgmt_run();
