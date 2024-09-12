@@ -127,9 +127,9 @@ static void services_init(void)  {
     bas_init_obj.p_report_ref         = NULL;
     bas_init_obj.initial_batt_level   = 0;
 
-    bas_init_obj.bl_rd_sec        = SEC_JUST_WORKS;
-    bas_init_obj.bl_cccd_wr_sec   = SEC_JUST_WORKS;
-    bas_init_obj.bl_report_rd_sec = SEC_JUST_WORKS;
+    bas_init_obj.bl_rd_sec        = SEC_OPEN;
+    bas_init_obj.bl_cccd_wr_sec   = SEC_OPEN;
+    bas_init_obj.bl_report_rd_sec = SEC_OPEN;
 
     err_code = ble_bas_init(&m_bas, &bas_init_obj);
     APP_ERROR_CHECK(err_code);

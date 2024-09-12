@@ -6,7 +6,7 @@
 #include <nrf_saadc.h>
 
 
-uint32_t analogRead(nrf_saadc_input_t ch) {
+uint32_t analogRead(const nrf_saadc_input_t ch) {
     nrf_saadc_resolution_set(NRF_SAADC_RESOLUTION_10BIT);
     nrf_saadc_enable();
     for(size_t i=0; i<NRF_SAADC_CHANNEL_COUNT; i++) {
@@ -26,8 +26,8 @@ uint32_t analogRead(nrf_saadc_input_t ch) {
     };
     nrf_saadc_channel_init(0, &cfg);
 
-    nrf_saadc_value_t value = 0;
-    nrf_saadc_buffer_init(&value, 1);
+    volatile nrf_saadc_value_t value = 0;
+    nrf_saadc_buffer_init((nrf_saadc_value_t*)&value, 1);
 
     nrf_saadc_task_trigger(NRF_SAADC_TASK_START);
     nrf_saadc_task_trigger(NRF_SAADC_TASK_SAMPLE);
@@ -36,6 +36,7 @@ uint32_t analogRead(nrf_saadc_input_t ch) {
     nrf_saadc_event_clear(NRF_SAADC_EVENT_STARTED);
     nrf_saadc_event_clear(NRF_SAADC_EVENT_END);
     nrf_saadc_disable();
+    if(value<0) value=0;
     return value;
 }
 

@@ -154,11 +154,12 @@ void update_battery(void * p_context) {
     //     last_time = millis();
 
         uint32_t v = analogRead(BAT_ADC_CH);
-        logf("got ADC, %d, ", v);
+        //logf("got ADC, %d\n", v);
         v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
+        //logf("mV=%d\n", v);
         v = std::clamp(v, 3300ul, 4200ul);
-
         v = map(v, 3300, 4200, 0, 100);
+        //v = map(v, 0, 3000, 0, 100);
         set_bas(v);
     // }
 }
@@ -255,6 +256,7 @@ int main() {
     app_timer_init();
 
     setup();
+    update_battery(nullptr);
 
     uint32_t err_code;
     err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
@@ -263,7 +265,7 @@ int main() {
 
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
-    app_timer_start(m_battery_timer, APP_TIMER_TICKS(60000), nullptr);
+    app_timer_start(m_battery_timer, APP_TIMER_TICKS(15000), nullptr);
 
     while(1) {
         nrf_pwr_mgmt_run();

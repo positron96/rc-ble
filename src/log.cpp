@@ -32,13 +32,13 @@ void logs(const char* msg) {
     if(msg != txbuf) {
         memcpy(txbuf, msg, l);
     }
-    if(nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_TXSTARTED)) {
-        nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_TXSTARTED);
-        while(!nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_ENDTX)) {}
-    }
-    nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_ENDTX);
+    // if(nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_TXSTARTED)) {
+    //     nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_TXSTARTED);
+    // }
     nrf_uarte_tx_buffer_set(log_uart, (uint8_t*)txbuf, l);
     nrf_uarte_task_trigger(log_uart, NRF_UARTE_TASK_STARTTX);
+    while(!nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_ENDTX)) {}
+    nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_ENDTX);
 }
 
 void logln(const char* msg) {
