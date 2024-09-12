@@ -334,4 +334,65 @@ namespace fn {
 
     };
 
+    /**
+     * Allows to output several "pins" to one analog pin.
+     *
+     * Setting each input pin will output a predefined analog value to the output.
+     * This can be used to output both marker light (low power)
+     *  and brake light (high power) to rear red lamps.
+     */
+    template<size_t N_INPUTS = 2>
+    class MultiInputPin {
+        using ThisClass = MultiInputPin<N_INPUTS>;
+        BaseAnalogPin *output;
+
+        class _Pin: public BasePin {
+            ThisClass &parent;
+            uint8_t pwm;
+            bool on;
+            friend class MultiInputPin;
+        public:
+            _Pin(ThisClass &parent, uint8_t pwm)
+                : parent{parent}, pwm{pwm}
+            {}
+
+            void set(bool val) override {
+                this->on = val;
+                parent.refresh();
+            };
+        };
+        etl::vector<_Pin, N_INPUTS> pins;
+        friend class _Pin;
+        void refresh() {
+            uint8_t max_pwm = 0;
+            for(auto &p: pins) {
+                if(p.on && p.pwm > max_pwm) max_pwm = p.pwm;
+                output->set(max_pwm);
+            }
+        }
+    public:
+        MultiInputPin(BaseAnalogPin *output): output{output} {}
+
+        BasePin* create_pin(int8_t pwm) {
+            if(pins.available()==0) return nullptr;
+            return &pins.emplace_back(*this, pwm);
+        }
+
+    };
+
+    /** A virtual pin that controls several physical pins at once. */
+    template <size_t N_OUTPUTS=2>
+    class MultiOutputPin: public BasePin {
+        etl::vector<BasePin*, N_OUTPUTS> outputs;
+    public:
+        MultiOutputPin(std::initializer_list<BasePin*> outputs)
+            : outputs{outputs}
+        {
+        }
+        void add_output(BasePin *pin) {outputs.push_back(pin);}
+        void set(bool val) override {
+            for(auto &pin: outputs) pin->set(val);
+        }
+    };
+
 };

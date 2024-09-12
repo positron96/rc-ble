@@ -41,14 +41,18 @@ nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left{D5};
 nrf::Pin pin_light_right{D6};
 nrf::Pin pin_light_main{D1};
-nrf::Pin pin_light_brake{D2};
+nrf::PwmPin pin_light_rear_red{D2};
 nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_marker{D4};
+nrf::Pin pin_light_marker_side{D4};
+
+fn::MultiInputPin pin_light_red{&pin_light_rear_red};
+
+fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(128)};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
-fn::Driving driver{&hbridge, &pin_light_reverse, &pin_light_brake};
+fn::Driving driver{&hbridge, &pin_light_reverse, pin_light_red.create_pin(255)};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 fn::Simple marker_light{&pin_light_marker};
