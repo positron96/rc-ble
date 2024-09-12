@@ -47,18 +47,18 @@ namespace fn {
     };
 
 
-    struct Hbridge {
+    struct BaseHbridge {
         virtual void set(uint8_t val, bool fwd) = 0;
     };
 
-    struct Pin {
+    struct BasePin {
         virtual void set(bool val) = 0;
         void on() { set(true); }
         void off() { set(false); }
     };
 
-    struct PwmPin: Pin {
-        uint8_t val_on;
+    struct BaseAnalogPin: BasePin {
+        uint8_t val_on = 255;
 
         virtual void set_pwm(uint8_t val) = 0;
         void set(bool val) override {
@@ -67,9 +67,9 @@ namespace fn {
     };
 
     struct Blinker: Ticking {
-        Pin *pin;
+        BasePin *pin;
 
-        Blinker(Pin *p): pin{p}, half_period_ticks{ms_to_ticks(500)} {}
+        Blinker(BasePin *p): pin{p}, half_period_ticks{ms_to_ticks(500)} {}
 
         void set(bool val) {
             if(val!=on) {
@@ -95,7 +95,7 @@ namespace fn {
         bool on;
     };
 
-    struct Servo {
+    struct BaseServo {
         uint16_t center_us = 1500;
         int16_t half_range = 500;
         int8_t val = 127;
@@ -156,10 +156,10 @@ namespace fn {
      *
      * Useful to not make reverse or brake lights too short.
      */
-    class DelayedOffPin: public Pin, public DelayedOff {
-        Pin &pin;
+    class DelayedOffPin: public BasePin, public DelayedOff {
+        BasePin &pin;
     public:
-        DelayedOffPin(Pin &pin, size_t delay_ms): DelayedOff{delay_ms}, pin{pin} {}
+        DelayedOffPin(BasePin &pin, size_t delay_ms): DelayedOff{delay_ms}, pin{pin} {}
         void set(bool val) { DelayedOff::set(val); if(val) { pin.set(true); } }
         void force_off() { DelayedOff::force_off(); pin.set(false);}
         void tick() {
@@ -184,7 +184,7 @@ namespace fn {
     };
 
     struct Driving: Fn, Ticking {
-        Hbridge *hbridge;
+        BaseHbridge *hbridge;
         DelayedOffPin reverse_lights;
         DelayedOffPin brake_lights;
         int8_t deadzone = 4;
@@ -194,7 +194,7 @@ namespace fn {
         SmoothValue<uint8_t> output;
         bool current_fwd;
 
-        Driving(Hbridge *hbridge, Pin *rev_lights, Pin *brake_lights):
+        Driving(BaseHbridge *hbridge, BasePin *rev_lights, BasePin *brake_lights):
             hbridge{hbridge},
             reverse_lights{*rev_lights, 500},
             brake_lights{*brake_lights, 500}
@@ -271,14 +271,14 @@ namespace fn {
     };
 
     struct Steering: Fn, Ticking {
-        fn::Servo *servo;
+        fn::BaseServo *servo;
         fn::Blinker *left;
         fn::Blinker *right;
         uint8_t deadzone = 4;
         uint8_t light_on_limit = 20;
         static constexpr size_t BlinkerPeriod = 1000;
 
-        Steering(Servo *s, Blinker *l, Blinker *r):
+        Steering(BaseServo *s, Blinker *l, Blinker *r):
             servo{s}, left{l}, right{r}, value{10}, blinker_delay{100}
         {}
 
@@ -320,9 +320,9 @@ namespace fn {
     };
 
     struct Simple: Fn {
-        Pin *pin;
+        BasePin *pin;
 
-        Simple(Pin *p): pin{p} {}
+        Simple(BasePin *p): pin{p} {}
 
         void set(uint8_t val) override {
             pin->set(val > 127);
@@ -332,6 +332,68 @@ namespace fn {
             pin->set(false);
         }
 
+    };
+
+    /**
+     * Allows to output several "pins" to one analog pin.
+     *
+     * Setting each input pin will output a predefined analog value to the output.
+     * This can be used to output both marker light (low power)
+     *  and brake light (high power) to rear red lamps.
+     */
+    template<size_t N_INPUTS = 2>
+    class MultiInputPin {
+        using ThisClass = MultiInputPin<N_INPUTS>;
+        BaseAnalogPin *output;
+
+        class _Pin: public BasePin {
+            ThisClass &parent;
+            uint8_t pwm;
+            bool on;
+            friend class MultiInputPin;
+        public:
+            _Pin(ThisClass &parent, uint8_t pwm)
+                : parent{parent}, pwm{pwm}
+            {}
+
+            void set(bool val) override {
+                this->on = val;
+                //logf("set(%d), pwm=%d\n", val, pwm);
+                parent.refresh();
+            };
+        };
+        etl::vector<_Pin, N_INPUTS> pins;
+        friend class _Pin;
+        void refresh() {
+            uint8_t max_pwm = 0;
+            for(auto &p: pins) {
+                if(p.on && p.pwm > max_pwm) max_pwm = p.pwm;
+                output->set_pwm(max_pwm);
+            }
+        }
+    public:
+        MultiInputPin(BaseAnalogPin *output): output{output} {}
+
+        BasePin* create_pin(uint8_t pwm) {
+            if(pins.available()==0) return nullptr;
+            return &pins.emplace_back(*this, pwm);
+        }
+
+    };
+
+    /** A virtual pin that controls several physical pins at once. */
+    template <size_t N_OUTPUTS=2>
+    class MultiOutputPin: public BasePin {
+        etl::vector<BasePin*, N_OUTPUTS> outputs;
+    public:
+        MultiOutputPin(std::initializer_list<BasePin*> outputs)
+            : outputs{outputs}
+        {
+        }
+        void add_output(BasePin *pin) {outputs.push_back(pin);}
+        void set(bool val) override {
+            for(auto &pin: outputs) pin->set(val);
+        }
     };
 
 };

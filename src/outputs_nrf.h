@@ -18,7 +18,7 @@ namespace nrf {
 
     struct ServoTimer;
 
-    struct Servo: fn::Servo {
+    struct Servo: fn::BaseServo {
 
         size_t pin;
         ServoTimer *owner;
@@ -174,7 +174,7 @@ namespace nrf {
     };
 
     class PWM;
-    struct HBridge: fn::Hbridge {
+    struct HBridge: fn::BaseHbridge {
         size_t pin1, pin2;
         PWM *owner;
         size_t index;
@@ -183,14 +183,12 @@ namespace nrf {
         void set(uint8_t val, bool fwd) override;
     };
 
-    struct PwmPin: fn::PwmPin {
+    struct PwmPin: fn::BaseAnalogPin {
         size_t pin;
-
         size_t idx;
+        PWM *owner;
         PwmPin(size_t p): pin{p} {}
-        void set_pwm(uint8_t val) override {
-
-        };
+        void set_pwm(uint8_t val) override;
     };
 
     NRF_PWM_Type *pwm = NRF_PWM0;
@@ -214,7 +212,10 @@ namespace nrf {
 
         bool add_pin(PwmPin &pin) {
             if(available_pins()<1) return false;
+            pin.idx = pins.size();
+            pin.owner = this;
             pins.push_back(pin.pin);
+            return true;
         }
 
         void init() {
@@ -271,7 +272,7 @@ namespace nrf {
         size_t available_pins() { return NUM_PINS - pins.size(); }
     };
 
-    class Pin: public fn::Pin {
+    class Pin: public fn::BasePin {
     public:
         size_t pin;
         Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
@@ -286,6 +287,10 @@ void nrf::Servo::set_us(uint16_t us) {
     owner->set_us(index, us);
 };
 
-void nrf::HBridge:: set(uint8_t val, bool fwd) {
+void nrf::HBridge::set(uint8_t val, bool fwd) {
     owner->set_hbridge(val, fwd, index);
+};
+
+void nrf::PwmPin::set_pwm(uint8_t val) {
+    owner->set_pwm(val, idx);
 };

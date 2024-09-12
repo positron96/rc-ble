@@ -13,6 +13,7 @@
 
 #include "functions.h"
 #include "outputs_nrf.h"
+#include "nrf_pdm.h"
 #include "line_processor.h"
 #include "battery.h"
 #include "simple_ble.h"
@@ -41,14 +42,20 @@ nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left{D5};
 nrf::Pin pin_light_right{D6};
 nrf::Pin pin_light_main{D1};
-nrf::Pin pin_light_brake{D2};
+//nrf::PdmPin pin_light_main{D1};
+
+nrf::PwmPin pin_light_rear_red{D2};
 nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_marker{D4};
+nrf::Pin pin_light_marker_side{D4};
+
+fn::MultiInputPin pin_light_red{&pin_light_rear_red};
+
+fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32)};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
-fn::Driving driver{&hbridge, &pin_light_reverse, &pin_light_brake};
+fn::Driving driver{&hbridge, &pin_light_reverse, pin_light_red.create_pin(255)};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 fn::Simple marker_light{&pin_light_marker};
@@ -67,6 +74,7 @@ uint32_t millis(void) {
 
 void setup() {
     pwm.add_hbridge(hbridge);
+    pwm.add_pin(pin_light_rear_red);
 
     functions.push_back(&driver);
 
@@ -243,12 +251,16 @@ void loop() {
 // }
 
 APP_TIMER_DEF(m_tick_timer);
-
 APP_TIMER_DEF(m_battery_timer);
+APP_TIMER_DEF(m_pdm_timer);
 
 void timer_tick(void * p_context) {
     loop();
 }
+
+// void update_pdm(void * ctx) {
+//     pin_light_main.tick();
+// }
 
 int main() {
     log_init();
@@ -266,6 +278,10 @@ int main() {
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
     app_timer_start(m_battery_timer, APP_TIMER_TICKS(15000), nullptr);
+
+    // err_code = app_timer_create(&m_pdm_timer, APP_TIMER_MODE_REPEATED, update_pdm);
+    // APP_ERROR_CHECK(err_code);
+    // app_timer_start(m_pdm_timer, APP_TIMER_TICKS(1), nullptr);
 
     while(1) {
         nrf_pwr_mgmt_run();
