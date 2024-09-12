@@ -1,5 +1,6 @@
-#include <nrf_delay.h>
+#include <algorithm>
 
+#include <nrf_delay.h>
 #include <app_timer.h>
 
 #include <etl/vector.h>
@@ -13,7 +14,7 @@
 #include "functions.h"
 #include "outputs_nrf.h"
 #include "line_processor.h"
-
+#include "battery.h"
 #include "simple_ble.h"
 #include "bootloader.h"
 
@@ -24,6 +25,7 @@ volatile uint8_t val;
 etl::vector<fn::Fn*, 10> functions;
 
 constexpr size_t BAT_PIN = 30;
+constexpr nrf_saadc_input_t BAT_ADC_CH = NRF_SAADC_INPUT_AIN6;
 constexpr size_t D1 = 5;
 constexpr size_t D2 = 6;
 constexpr size_t D3 = 9;
@@ -141,21 +143,23 @@ void process_str(const char* buf, size_t len) {
 
 }
 
-void update_battery() {
+long map(long x, long in_min, long in_max, long out_min, long out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void update_battery(void * p_context) {
     // static size_t last_time=0;
     // constexpr size_t INTERVAL_S = 60;
     // if(millis() - last_time > INTERVAL_S*1000) {
     //     last_time = millis();
 
-    //     uint32_t v = analogRead(BAT_PIN);
-    //     //logf("got ADC, %d, ", v);
-    //     v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
-    //     uint8_t char_data[3] = {0b0100'0000, uint8_t((v>>8) & 0xFF), uint8_t(v & 0xFF)};
-    //     pBatEnergyChar->setValue(char_data, 3);
-    //     //logf("%X\n", char_data);
-    //     v = constrain(v, 3300, 4200);
-    //     v = map(v, 3300, 4200, 0, 100);
-    //     pBatChar->setValue<uint8_t>(v);
+        uint32_t v = analogRead(BAT_ADC_CH);
+        logf("got ADC, %d, ", v);
+        v = v * (27+68)/68 * 600 * 5 / 1024;  // 0.6V ref, 1/5 gain
+        v = std::clamp(v, 3300ul, 4200ul);
+
+        v = map(v, 3300, 4200, 0, 100);
+        set_bas(v);
     // }
 }
 
@@ -231,14 +235,15 @@ void loop() {
     bl_right.tick();
     bl_left.tick();
 
-    update_battery();
 }
 
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
 //     logf("ERROR %d %s:%d\n", err, filename, line);
 // }
 
-APP_TIMER_DEF(m_tick_timer_id);
+APP_TIMER_DEF(m_tick_timer);
+
+APP_TIMER_DEF(m_battery_timer);
 
 void timer_tick(void * p_context) {
     loop();
@@ -252,9 +257,13 @@ int main() {
     setup();
 
     uint32_t err_code;
-    err_code = app_timer_create(&m_tick_timer_id, APP_TIMER_MODE_REPEATED, timer_tick);
+    err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
     APP_ERROR_CHECK(err_code);
-    app_timer_start(m_tick_timer_id, APP_TIMER_TICKS(fn::Ticking::PERIOD_MS), nullptr);
+    app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Ticking::PERIOD_MS), nullptr);
+
+    err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
+    APP_ERROR_CHECK(err_code);
+    app_timer_start(m_battery_timer, APP_TIMER_TICKS(60000), nullptr);
 
     while(1) {
         nrf_pwr_mgmt_run();

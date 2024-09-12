@@ -12,6 +12,7 @@
 #include "nrf_sdh_ble.h"
 #include "nrf_ble_gatt.h"
 #include "ble_nus.h"
+#include "ble_bas.h"
 #include "app_timer.h"
 
 #include <nrf_log.h>
@@ -52,9 +53,10 @@
 
 
 
-BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);                                   /**< BLE NUS service instance. */
+BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);
+BLE_BAS_DEF(m_bas);
 NRF_BLE_GATT_DEF(m_gatt);
-BLE_ADVERTISING_DEF(m_advertising);                                                 /**< Advertising module instance. */
+BLE_ADVERTISING_DEF(m_advertising);
 
 static uint16_t   m_conn_handle          = BLE_CONN_HANDLE_INVALID;                 /**< Handle of the current connection. */
 static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
@@ -78,6 +80,21 @@ extern void process_str(const char* buf, size_t len);
 using BLELineProcessor = line_processor::LineProcessor<NRF_UART_RX_BUFFER_SIZE>;
 BLELineProcessor rx(line_processor::callback_t::create<process_str>());
 
+void set_bas(uint8_t battery_level) {
+    ret_code_t err_code;
+    err_code = ble_bas_battery_level_update(&m_bas, battery_level, BLE_CONN_HANDLE_ALL);
+    if ((err_code != NRF_SUCCESS) &&
+        (err_code != NRF_ERROR_BUSY) &&
+        (err_code != NRF_ERROR_RESOURCES) &&
+        (err_code != NRF_ERROR_FORBIDDEN) &&
+        (err_code != NRF_ERROR_INVALID_STATE) &&
+        (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+       )
+    {
+        APP_ERROR_HANDLER(err_code);
+    }
+}
+
 
 static void nus_data_handler(ble_nus_evt_t * p_evt) {
 
@@ -95,11 +112,28 @@ static void nus_data_handler(ble_nus_evt_t * p_evt) {
 
 static void services_init(void)  {
     uint32_t           err_code;
-    ble_nus_init_t     nus_init;
+
     // Initialize NUS.
+    ble_nus_init_t     nus_init;
     memset(&nus_init, 0, sizeof(nus_init));
     nus_init.data_handler = nus_data_handler;
     err_code = ble_nus_init(&m_nus, &nus_init);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialize BAS
+    ble_bas_init_t bas_init_obj;
+    memset(&bas_init_obj, 0, sizeof(bas_init_obj));
+
+    bas_init_obj.evt_handler          = NULL;
+    bas_init_obj.support_notification = true;
+    bas_init_obj.p_report_ref         = NULL;
+    bas_init_obj.initial_batt_level   = 0;
+
+    bas_init_obj.bl_rd_sec        = SEC_JUST_WORKS;
+    bas_init_obj.bl_cccd_wr_sec   = SEC_JUST_WORKS;
+    bas_init_obj.bl_report_rd_sec = SEC_JUST_WORKS;
+
+    err_code = ble_bas_init(&m_bas, &bas_init_obj);
     APP_ERROR_CHECK(err_code);
 }
 

@@ -11,7 +11,6 @@
 #ifdef LOG_UART
 
 #include <nrf_uarte.h>
-#include <app_uart.h>
 
 NRF_UARTE_Type *log_uart = NRF_UARTE0;
 
