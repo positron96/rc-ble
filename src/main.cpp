@@ -111,7 +111,7 @@ void process_str(const char* buf, size_t len) {
         if (in.compare("!dfu") == 0) {
             reboot_to_bootloader();
             return;
-        }
+        } else
         if(in.starts_with("!trim_steer=")) {
             auto val = parse<uint16_t>(in.substr(12));
             if(val.has_value()) {
@@ -120,6 +120,11 @@ void process_str(const char* buf, size_t len) {
             } else {
                 logf("parse error '%s': %s\n", in, val.error().c_str());
             }
+        } else
+        if(in.starts_with("!invert_drive=")) {
+            hbridge.inverted = in.at(14) == '1';
+        } else {
+            logf("Unknown cmd: '%s'\n", buf);
         }
         return;
     }
@@ -252,7 +257,7 @@ void loop() {
 
 APP_TIMER_DEF(m_tick_timer);
 APP_TIMER_DEF(m_battery_timer);
-APP_TIMER_DEF(m_pdm_timer);
+// APP_TIMER_DEF(m_pdm_timer);
 
 void timer_tick(void * p_context) {
     loop();

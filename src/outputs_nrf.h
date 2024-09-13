@@ -288,7 +288,7 @@ void nrf::Servo::set_us(uint16_t us) {
 };
 
 void nrf::HBridge::set(uint8_t val, bool fwd) {
-    owner->set_hbridge(val, fwd, index);
+    owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
 };
 
 void nrf::PwmPin::set_pwm(uint8_t val) {

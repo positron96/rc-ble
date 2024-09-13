@@ -46,11 +46,6 @@ namespace fn {
         virtual void tick() = 0;
     };
 
-
-    struct BaseHbridge {
-        virtual void set(uint8_t val, bool fwd) = 0;
-    };
-
     struct BasePin {
         virtual void set(bool val) = 0;
         void on() { set(true); }
@@ -64,6 +59,11 @@ namespace fn {
         void set(bool val) override {
             set_pwm(val ? val_on : 0);
         }
+    };
+
+    struct BaseHbridge {
+        bool inverted = false; ///< don't forget to use it in implementation
+        virtual void set(uint8_t val, bool fwd) = 0;
     };
 
     struct Blinker: Ticking {
