@@ -38,8 +38,13 @@
 
 #define APP_BLE_OBSERVER_PRIO           3                                           /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
-#define APP_ADV_INTERVAL                MSEC_TO_UNITS(50, UNIT_0_625_MS)            /**< The advertising interval (in units of 0.625 ms) */
-#define APP_ADV_DURATION                MSEC_TO_UNITS(60000, UNIT_10_MS)              /**< The advertising duration in units of 10 milliseconds. */
+// fast advertising: every 50ms for 1min
+#define APP_ADV_INTERVAL                MSEC_TO_UNITS(50, UNIT_0_625_MS)
+#define APP_ADV_DURATION                MSEC_TO_UNITS(60000, UNIT_10_MS)
+// slow advertising: every 1s for 3 min.
+// 3min does not really matter as it will be restarted infinitely.
+#define APP_ADV_INTERVAL2               MSEC_TO_UNITS(1000, UNIT_0_625_MS);
+#define APP_ADV_DURATION2               MSEC_TO_UNITS(180000, UNIT_10_MS);
 
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
@@ -109,10 +114,10 @@ static void nus_data_handler(ble_nus_evt_t * p_evt) {
 
 
 static void services_init(void)  {
-    uint32_t           err_code;
+    uint32_t err_code;
 
     // Initialize NUS.
-    ble_nus_init_t     nus_init;
+    ble_nus_init_t nus_init;
     memset(&nus_init, 0, sizeof(nus_init));
     nus_init.data_handler = nus_data_handler;
     err_code = ble_nus_init(&m_nus, &nus_init);
@@ -279,9 +284,10 @@ static void gap_params_init(void) {
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
-    err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *) DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
+    err_code = sd_ble_gap_device_name_set(
+        &sec_mode,
+        (const uint8_t *) DEVICE_NAME,
+        strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -337,8 +343,8 @@ static void advertising_init(void) {
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
     init.config.ble_adv_fast_timeout  = APP_ADV_DURATION;
     init.config.ble_adv_slow_enabled = true;
-    init.config.ble_adv_slow_interval = MSEC_TO_UNITS(2000, UNIT_0_625_MS);
-    init.config.ble_adv_slow_timeout = MSEC_TO_UNITS(180000, UNIT_10_MS);
+    init.config.ble_adv_slow_interval = APP_ADV_INTERVAL2;
+    init.config.ble_adv_slow_timeout = APP_ADV_DURATION2;
     init.evt_handler = on_adv_evt;
 
     err_code = ble_advertising_init(&m_advertising, &init);

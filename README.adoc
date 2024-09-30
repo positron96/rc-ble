@@ -1,4 +1,4 @@
-# rc-ble
+## RC-BLE
 
 Firmware for BLE-based RC receiver for miniature RC vehicles.
 
@@ -22,6 +22,30 @@ Example "open_bootloader" from the SDK
  was used.
 Instructions for flashing will come later.
 
+### Communication protocol
+
+Communication is via UART-like interface over BLE.
+At the moment, UUIDs of Nordic UART Service (NUS) are used:
+
+* `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` is service UUID
+* `6E400002-B5A3-F393-E0A9-E50E24DCCA9E` is RX charachteristic UUID. This is tha main channel to communicate with FW, send data to this charachteristic.
+* `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` is TX charachteristic UUID (not used at the moment)
+
+Basic commands follow typical RC protocols that simply contain values for each control channel.
+These commands are separated by newline ("`\n`").
+
+.Commands table
+[cols="1a,2a"]
+|===
+|Command|Description
+|`N=V`
+| Set channel N to value V (uint8, center position is 128).
+So far there are 3 channels: 0=throttle, 1=steering, 2=headlights, 3=marker lights.
+| `!dfu` | Reboot into DFU mode (see below).
+| `!trim_steer=N` | Change center value of steer servo to Nus
+| `!invert_drive=0` or `invert_drive=1` | Whether to invert drive direction.
+|===
+
 ## Notes and links
 
 https://github.com/NordicPlayground/nrf52-timer-gpiote-ppi-hands-on/blob/master/main.c - example of generating PWM with timer, PPI and GPIOTE and no involvement or CPU.
@@ -31,3 +55,4 @@ https://docs.nordicsemi.com/bundle/sds_s112/page/SDS/s1xx/sd_resource_reqs/hw_bl
 https://novelbits.io/nrf52-ota-dfu-ble-part-4/ - an short tutorial of DFU OTA
 
 https://devzone.nordicsemi.com/guides/short-range-guides/b/software-development-kit/posts/getting-started-with-nordics-secure-dfu-bootloader - a Nordic article about DFU.
+
