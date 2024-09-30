@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BLE_SD_H_
+#define BLE_SD_H_
 
 #include <stdint.h>
 #include "nordic_common.h"
@@ -43,8 +44,8 @@
 #define APP_ADV_DURATION                MSEC_TO_UNITS(60000, UNIT_10_MS)
 // slow advertising: every 1s for 3 min.
 // 3min does not really matter as it will be restarted infinitely.
-#define APP_ADV_INTERVAL2               MSEC_TO_UNITS(1000, UNIT_0_625_MS);
-#define APP_ADV_DURATION2               MSEC_TO_UNITS(180000, UNIT_10_MS);
+#define APP_ADV_INTERVAL2               MSEC_TO_UNITS(1000, UNIT_0_625_MS)
+#define APP_ADV_DURATION2               MSEC_TO_UNITS(180000, UNIT_10_MS)
 
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
@@ -399,3 +400,4 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
     on_error();
 }
 
+#endif // BLE_SD_H_

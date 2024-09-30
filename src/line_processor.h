@@ -19,7 +19,6 @@ namespace line_processor {
     class LineProcessor {
     public:
 
-
         LineProcessor(callback_t cb): cb{cb} {
 
         }

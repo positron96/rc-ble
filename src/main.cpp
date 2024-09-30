@@ -12,11 +12,11 @@
 
 
 #include "functions.h"
-#include "outputs_nrf.h"
-#include "nrf_pdm.h"
+#include "nrf_functions.h"
+#include "nrf_functions_pdm.h"
 #include "line_processor.h"
 #include "battery.h"
-#include "simple_ble.h"
+#include "ble_sd.h"
 #include "bootloader.h"
 
 #define delay nrf_delay_ms
@@ -157,7 +157,7 @@ void process_str(const char* buf, size_t len) {
 }
 
 long map(long x, long in_min, long in_max, long out_min, long out_max) {
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 void update_battery(void * p_context) {
@@ -186,10 +186,7 @@ enum class State {
 
 line_processor::LineProcessor<> serial_rx(line_processor::callback_t::create<process_str>());
 
-void loop() {
-    // if(Serial.available()) {
-    //     while(Serial.available()>0) {serial_rx.add(Serial.read());}
-    // }
+void timer_tick(void * p_context) {
 
     static State state = State::RecentlyDisconnected;
 
@@ -258,10 +255,6 @@ void loop() {
 APP_TIMER_DEF(m_tick_timer);
 APP_TIMER_DEF(m_battery_timer);
 // APP_TIMER_DEF(m_pdm_timer);
-
-void timer_tick(void * p_context) {
-    loop();
-}
 
 // void update_pdm(void * ctx) {
 //     pin_light_main.tick();
