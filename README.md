@@ -24,6 +24,10 @@ Instructions for flashing will come later.
 
 ## Notes and links
 
-Example of TIMER+PPI+GPIOTE PWM implementation
+https://github.com/NordicPlayground/nrf52-timer-gpiote-ppi-hands-on/blob/master/main.c - example of generating PWM with timer, PPI and GPIOTE and no involvement or CPU.
 
-https://github.com/NordicPlayground/nrf52-timer-gpiote-ppi-hands-on/blob/master/main.c
+https://docs.nordicsemi.com/bundle/sds_s112/page/SDS/s1xx/sd_resource_reqs/hw_block_interrupt_vector.html - on what peripherals are occupied by SoftDevice
+
+https://novelbits.io/nrf52-ota-dfu-ble-part-4/ - an short tutorial of DFU OTA
+
+https://devzone.nordicsemi.com/guides/short-range-guides/b/software-development-kit/posts/getting-started-with-nordics-secure-dfu-bootloader - a Nordic article about DFU.
