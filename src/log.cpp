@@ -6,7 +6,8 @@
 #include <cstdio>
 
 #define LOG_RTT_
-#define LOG_UART
+#define LOG_UART_
+#define LOG_BLE
 
 #ifdef LOG_UART
 
@@ -104,6 +105,38 @@ void logf(const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
     SEGGER_RTT_vprintf(0, fmt, &args);
+    va_end(args);
+}
+
+#elif defined(LOG_BLE)
+
+void log_init() {
+}
+
+extern void send_ble(const char* msg, const size_t len);
+
+void logs(const char* msg) {
+    send_ble(msg, strlen(msg));
+}
+
+void logln(const char* msg) {
+    logs(msg);
+    logs("\n");
+}
+
+constexpr size_t bufsize = 128;
+char txbuf[bufsize];
+
+/** Not reentrant! */
+void vlogf(const char * fmt, va_list args) {
+    vsnprintf(txbuf, bufsize, fmt, args);
+    logs(txbuf);
+}
+
+void logf(const char * fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vlogf(fmt, args);
     va_end(args);
 }
 

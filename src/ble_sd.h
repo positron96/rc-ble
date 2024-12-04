@@ -99,14 +99,27 @@ void set_bas(uint8_t battery_level) {
     }
 }
 
+void send_ble(const char* msg, const size_t len) {
+    if(m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+        return;
+    }
+    uint16_t l = len;
+    uint8_t* d = (uint8_t*)msg;
+    uint32_t err_code = ble_nus_data_send(&m_nus, d, &l, m_conn_handle);
+    if ((err_code != NRF_ERROR_INVALID_STATE) &&
+        (err_code != NRF_ERROR_RESOURCES) &&
+        (err_code != NRF_ERROR_NOT_FOUND))
+    {
+        APP_ERROR_CHECK(err_code);
+    }
+}
 
 static void nus_data_handler(ble_nus_evt_t * p_evt) {
 
     if (p_evt->type == BLE_NUS_EVT_RX_DATA) {
-        NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
 
-        for (uint32_t i = 0; i < p_evt->params.rx_data.length; i++) {
+        for (uint16_t i = 0; i < p_evt->params.rx_data.length; i++) {
             char ch = (char)p_evt->params.rx_data.p_data[i];
             if(ch!=0) rx.add(ch);
         }
