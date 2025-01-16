@@ -18,6 +18,7 @@
 #include "battery.h"
 #include "ble_sd.h"
 #include "bootloader.h"
+#include "storage.h"
 
 #define delay nrf_delay_ms
 
@@ -73,6 +74,7 @@ uint32_t millis(void) {
 
 
 void setup() {
+    storage::init();
     pwm.add_hbridge(hbridge);
     pwm.add_pin(pin_light_rear_red);
 
