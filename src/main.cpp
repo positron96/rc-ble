@@ -74,6 +74,9 @@ uint32_t millis(void) {
 
 
 void setup() {
+    ret_code_t err_code = nrf_sdh_enable_request();
+    APP_ERROR_CHECK(err_code);
+
     storage::init();
     pwm.add_hbridge(hbridge);
     pwm.add_pin(pin_light_rear_red);

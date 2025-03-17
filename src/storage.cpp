@@ -57,9 +57,9 @@ namespace storage {
 
         static void fds_evt_handler(fds_evt_t const * p_evt) {
             if (p_evt->result == NRF_SUCCESS) {
-                logf("Event %d received (NRF_SUCCESS)\n", p_evt->id);
+                logf("fds event %d received (NRF_SUCCESS)\n", p_evt->id);
             } else {
-                logf("Event %d received (err %d)\n", p_evt->id, p_evt->result);
+                logf("fds event %d received (err %d)\n", p_evt->id, p_evt->result);
             }
 
             switch (p_evt->id) {
@@ -67,7 +67,8 @@ namespace storage {
                    if (p_evt->result == NRF_SUCCESS) { m_fds_initialized = true; }
                     break;
 
-                case FDS_EVT_WRITE: {
+                case FDS_EVT_WRITE:
+                case FDS_EVT_UPDATE: {
                     if (p_evt->result == NRF_SUCCESS) {
                         logf("Record ID:\t0x%04x\n",  p_evt->write.record_id);
                         logf("File ID:\t0x%04x\n",    p_evt->write.file_id);
@@ -75,6 +76,7 @@ namespace storage {
                     }
                 } break;
 
+                case FDS_EVT_DEL_FILE:
                 case FDS_EVT_DEL_RECORD: {
                     if (p_evt->result == NRF_SUCCESS) {
                         logf("Record ID:\t0x%04x\n",  p_evt->del.record_id);
@@ -146,12 +148,12 @@ namespace storage {
             APP_ERROR_CHECK(rc);
 
             /* Write the updated record to flash. */
-            rc = fds_record_update(&desc, &m_dummy_record);
-            if ((rc != NRF_SUCCESS) && (rc == FDS_ERR_NO_SPACE_IN_FLASH)) {
-                logln("No space in flash, delete some records to update the config file");
-            } else {
-                APP_ERROR_CHECK(rc);
-            }
+            // rc = fds_record_update(&desc, &m_dummy_record);
+            // if ((rc != NRF_SUCCESS) && (rc == FDS_ERR_NO_SPACE_IN_FLASH)) {
+            //     logln("No space in flash, delete some records to update the config file");
+            // } else {
+            //     APP_ERROR_CHECK(rc);
+            // }
         } else {
             /* System config not found; write a new one. */
             logln("Creating config file...\n");

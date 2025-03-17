@@ -18,7 +18,7 @@ constexpr size_t bufsize = 128;
 char txbuf[bufsize];
 
 void log_init() {
-
+    // only present on dev module, not on ble-rc board.
     nrf_uarte_txrx_pins_set(log_uart, 18, 15);//15, 18);
     nrf_uarte_baudrate_set(log_uart, NRF_UARTE_BAUDRATE_115200);
     nrf_uarte_configure(log_uart, NRF_UARTE_PARITY_EXCLUDED, NRF_UARTE_HWFC_DISABLED);
