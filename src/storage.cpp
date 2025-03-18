@@ -38,7 +38,7 @@ namespace storage {
         },
     };
 
-    static bool volatile m_fds_initialized;
+    static volatile int32_t event_result;
 
     static void fds_evt_handler(fds_evt_t const * evt) {
         if (evt->result == NRF_SUCCESS) {
@@ -47,11 +47,11 @@ namespace storage {
             logf("fds event %d err %d\n", evt->id, evt->result);
         }
 
+        event_result = evt->result;
+
         switch (evt->id) {
             case FDS_EVT_INIT:
-                if (evt->result == NRF_SUCCESS) { m_fds_initialized = true; }
                 break;
-
             case FDS_EVT_WRITE:
             case FDS_EVT_UPDATE: {
                 if (evt->result == NRF_SUCCESS) {
@@ -80,23 +80,40 @@ namespace storage {
 
         rc = fds_register(fds_evt_handler);
 
+        event_result = -1;
         rc = fds_init();
         APP_ERROR_CHECK(rc);
-        while (!m_fds_initialized)  {
-            #ifdef SOFTDEVICE_PRESENT
-                (void) sd_app_evt_wait();
-            #else
-                __WFE();
-            #endif
-        }
+        while (event_result==-1)  { (void) sd_app_evt_wait(); }
 
         logln("Reading flash usage statistics...");
         fds_stat_t stat = {0};
         rc = fds_stat(&stat);
         APP_ERROR_CHECK(rc);
-        logf("Found %d valid records\n", stat.valid_records);
-        logf("Found %d dirty records (ready to be garbage collected)\n", stat.dirty_records);
+        logf("Stats: fsok=%c\n Avail=%dpg\n Valid=%drec\n Dirty=%drec\n",
+            stat.corruption?'N':'Y',
+            stat.pages_available, stat.valid_records, stat.dirty_records
+        );
+        logf(" Res: %dw\n Used: %dw\n Freeable: %dw\n",
+            stat.words_reserved, stat.words_used, stat.freeable_words);
 
+    }
+
+    bool clean() {
+        event_result = -1;
+        ret_code_t rc = fds_gc();
+        if(rc==NRF_SUCCESS) while (event_result==-1)  { (void) sd_app_evt_wait(); }
+        return rc == NRF_SUCCESS && event_result == NRF_SUCCESS;
+    }
+
+    bool wipe() {
+        fds_record_desc_t desc{0};
+        fds_find_token_t tok{0};
+        ret_code_t rc;
+        while (fds_record_iterate(&desc, &tok) != FDS_ERR_NOT_FOUND) {
+            rc = fds_record_delete(&desc);
+            logf("deleting %d = %d\n", desc.record_id, rc);
+        }
+        return rc == NRF_SUCCESS;
     }
 
 
