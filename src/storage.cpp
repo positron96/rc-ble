@@ -108,7 +108,7 @@ namespace storage {
     bool wipe() {
         fds_record_desc_t desc{0};
         fds_find_token_t tok{0};
-        ret_code_t rc;
+        ret_code_t rc = NRF_SUCCESS;
         while (fds_record_iterate(&desc, &tok) != FDS_ERR_NOT_FOUND) {
             rc = fds_record_delete(&desc);
             logf("deleting %d = %d\n", desc.record_id, rc);
