@@ -11,7 +11,7 @@
 #include <etl/expected.h>
 
 
-#include "functions.h"
+#include <functions.h>
 #include "nrf_functions.h"
 #include "nrf_functions_pdm.h"
 #include "nrf_functions_uart.h"
