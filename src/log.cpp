@@ -5,26 +5,25 @@
 #include <cstdarg>
 #include <cstdio>
 
-#define LOG_RTT_
-#define LOG_UART_
-#define LOG_BLE
+#define LOG_UART  1
+#define LOG_RTT   2
+#define LOG_BLE   3
+#define LOG_NONE  0
 
-#ifdef LOG_UART
+#ifndef LOG_TARGET
+  #define LOG_TARGET  LOG_UART
+#endif
 
-#include <nrf_uarte.h>
+#if (LOG_TARGET == LOG_UART)
 
-NRF_UARTE_Type *log_uart = NRF_UARTE0;
+#include "uart.hpp"
+
 
 constexpr size_t bufsize = 128;
 char txbuf[bufsize];
 
 void log_init() {
-    // only present on dev module, not on ble-rc board.
-    nrf_uarte_txrx_pins_set(log_uart, 18, 15);//15, 18);
-    nrf_uarte_baudrate_set(log_uart, NRF_UARTE_BAUDRATE_115200);
-    nrf_uarte_configure(log_uart, NRF_UARTE_PARITY_EXCLUDED, NRF_UARTE_HWFC_DISABLED);
-    nrf_uarte_enable(log_uart);
-
+    uart::init();
 }
 
 void logs(const char* msg) {
@@ -33,13 +32,7 @@ void logs(const char* msg) {
     if(msg != txbuf) {
         memcpy(txbuf, msg, l);
     }
-    // if(nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_TXSTARTED)) {
-    //     nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_TXSTARTED);
-    // }
-    nrf_uarte_tx_buffer_set(log_uart, (uint8_t*)txbuf, l);
-    nrf_uarte_task_trigger(log_uart, NRF_UARTE_TASK_STARTTX);
-    while(!nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_ENDTX)) {}
-    nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_ENDTX);
+    uart::write(txbuf, l);
 }
 
 void logln(const char* msg) {
@@ -82,7 +75,7 @@ void logf(const char * fmt, ...) {
 //     va_end(args);
 // }
 
-#elif defined(LOG_RTT)
+#elif (LOG_TARGET == LOG_RTT)
 
 #include "SEGGER_RTT.h"
 
@@ -108,7 +101,7 @@ void logf(const char * fmt, ...) {
     va_end(args);
 }
 
-#elif defined(LOG_BLE)
+#elif (LOG_TARGET == LOG_BLE)
 
 void log_init() {
 }
