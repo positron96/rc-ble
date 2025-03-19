@@ -18,6 +18,7 @@
 #include "battery.h"
 #include "ble_sd.h"
 #include "bootloader.h"
+#include "storage.h"
 
 #define delay nrf_delay_ms
 
@@ -73,6 +74,10 @@ uint32_t millis(void) {
 
 
 void setup() {
+    ret_code_t err_code = nrf_sdh_enable_request();
+    APP_ERROR_CHECK(err_code);
+
+    storage::init();
     pwm.add_hbridge(hbridge);
     pwm.add_pin(pin_light_rear_red);
 
@@ -103,6 +108,7 @@ etl::expected<T, etl::to_arithmetic_status> parse(const etl::string_view &str) {
     return etl::unexpected(val.error());
 }
 
+#define FMT_SV(sv)  (int)((sv).length()), (sv).data()
 
 void process_str(const char* buf, size_t len) {
     // logf("processing '%s'(%d)\n", buf, len);
@@ -123,6 +129,11 @@ void process_str(const char* buf, size_t len) {
         } else
         if(in.starts_with("!invert_drive=")) {
             hbridge.inverted = in.at(14) == '1';
+        } else
+        if(in.starts_with("!name=")) {
+            const auto new_name = in.substr(6);
+            storage::set_dev_name(new_name);
+            logf("name set to '%.*s'[%d]", FMT_SV(in), in.length());
         } else {
             logf("Unknown cmd: '%s'\n", buf);
         }

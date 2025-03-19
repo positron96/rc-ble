@@ -18,9 +18,9 @@
 
 #include <nrf_log.h>
 #include <nrf_log_ctrl.h>
-#include "nrf_log_default_backends.h"
+#include <nrf_log_default_backends.h>
 
-
+#include "storage.h"
 #include "line_processor.h"
 #include "log.h"
 
@@ -34,7 +34,6 @@
 
 #define APP_BLE_CONN_CFG_TAG            1                                           /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define DEVICE_NAME                     "MicroRC"                                   /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_BLE_OBSERVER_PRIO           3                                           /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -274,8 +273,10 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context) {
 static void ble_stack_init(void) {
     ret_code_t err_code;
 
-    err_code = nrf_sdh_enable_request();
-    APP_ERROR_CHECK(err_code);
+    if(!nrf_sdh_is_enabled()) {
+        err_code = nrf_sdh_enable_request();
+        APP_ERROR_CHECK(err_code);
+    }
 
     // Configure the BLE stack using the default settings.
     // Fetch the start address of the application RAM.
@@ -298,10 +299,17 @@ static void gap_params_init(void) {
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
+    const auto devname_opt = storage::get_dev_name();
+    const char* devname;
+    if(devname_opt) {
+        devname = devname_opt.value().data();
+    } else {
+        devname = storage::DEFAULT_DEVNAME;
+    }
     err_code = sd_ble_gap_device_name_set(
         &sec_mode,
-        (const uint8_t *) DEVICE_NAME,
-        strlen(DEVICE_NAME));
+        (const uint8_t *) devname,
+        strlen(devname));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
