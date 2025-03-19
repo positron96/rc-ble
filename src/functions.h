@@ -382,12 +382,13 @@ namespace fn {
     };
 
     /** A virtual pin that controls several physical pins at once. */
-    template <size_t N_OUTPUTS=2>
+    template <size_t N_OUTPUTS>
     class MultiOutputPin: public BasePin {
-        etl::vector<BasePin*, N_OUTPUTS> outputs;
+        etl::array<BasePin*, N_OUTPUTS> outputs;
     public:
-        MultiOutputPin(std::initializer_list<BasePin*> outputs)
-            : outputs{outputs}
+        template<class ...Args>
+        MultiOutputPin(Args ...outputs)
+            : outputs{outputs...}
         {
         }
         void add_output(BasePin *pin) {outputs.push_back(pin);}
@@ -395,5 +396,25 @@ namespace fn {
             for(auto &pin: outputs) pin->set(val);
         }
     };
+
+    // deduction guide
+    template<class ...D>
+    MultiOutputPin(D...) -> MultiOutputPin<sizeof...(D)>;
+
+    /** A dynamically-sized virtual pin that controls several physical pins at once. */
+    // template <size_t N_OUTPUTS>
+    // class MultiOutputPin: public BasePin {
+    //     etl::vector<BasePin*, N_OUTPUTS> outputs;
+    // public:
+
+    //     MultiOutputPin(std::initializer_list<BasePin*> outputs)
+    //         : outputs{outputs}
+    //     {
+    //     }
+    //     void add_output(BasePin *pin) {outputs.push_back(pin);}
+    //     void set(bool val) override {
+    //         for(auto &pin: outputs) pin->set(val);
+    //     }
+    // };
 
 };
