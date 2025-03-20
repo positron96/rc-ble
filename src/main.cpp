@@ -20,7 +20,7 @@
 #include "battery.h"
 #include "ble_sd.h"
 #include "bootloader.h"
-#include "storage.h"
+#include "storage.hpp"
 #include "uart.hpp"
 
 #define delay nrf_delay_ms

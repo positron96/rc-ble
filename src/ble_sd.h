@@ -20,7 +20,7 @@
 #include <nrf_log_ctrl.h>
 #include <nrf_log_default_backends.h>
 
-#include "storage.h"
+#include "storage.hpp"
 #include "line_processor.h"
 #include "log.h"
 
