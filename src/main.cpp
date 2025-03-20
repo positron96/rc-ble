@@ -11,10 +11,11 @@
 #include <etl/expected.h>
 
 
-#include <functions.h>
-#include "nrf_functions.h"
-#include "nrf_functions_pdm.h"
-#include "nrf_functions_uart.h"
+#include <outputs.hpp>
+#include <functions/car_functions.hpp>
+#include "nrf_outputs.hpp"
+#include "nrf_outputs_pdm.hpp"
+#include "nrf_outputs_uart.hpp"
 #include "line_processor.h"
 #include "battery.h"
 #include "ble_sd.h"
@@ -45,8 +46,8 @@ nrf::Pin pin_light_left_hw{D5};
 nrf::Pin pin_light_right_hw{D6};
 nrf::UartAnalogPin pin_light_left_uart{0, NRF_UARTE0};
 nrf::UartAnalogPin pin_light_right_uart{1, NRF_UARTE0};
-fn::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
-fn::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
+outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
+outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
 
 nrf::Pin pin_light_main{D1};
 //nrf::PdmPin pin_light_main{D1};
@@ -56,15 +57,15 @@ nrf::Pin pin_light_reverse{D3};
 nrf::Pin pin_light_marker_side{D4};
 nrf::UartAnalogPin pin_light_marker_uart{3, NRF_UARTE0};
 
-fn::MultiInputPin pin_light_red{&pin_light_rear_red};
+outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32), &pin_light_marker_uart};
+outputs::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32), &pin_light_marker_uart};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
 nrf::UartAnalogPin pin_brake_uart{2, NRF_UARTE0};
-fn::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
+outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
 
 fn::Driving driver{&hbridge, &pin_light_reverse, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};

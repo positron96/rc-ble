@@ -9,7 +9,7 @@
 #include <etl/vector.h>
 #include <etl/array.h>
 
-#include "functions.h"
+#include <outputs.hpp>
 
 #include "log.h"
 
@@ -18,7 +18,7 @@ namespace nrf {
 
     struct ServoTimer;
 
-    struct Servo: fn::BaseServo {
+    struct Servo: outputs::BaseServo {
 
         size_t pin;
         ServoTimer *owner;
@@ -174,16 +174,16 @@ namespace nrf {
     };
 
     class PWM;
-    struct HBridge: fn::BaseHbridge {
+    struct HBridge: outputs::BaseHbridge {
         size_t pin1, pin2;
         PWM *owner;
         size_t index;
         HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
 
-        void set(uint8_t val, bool fwd) override;
+        void set_raw(uint8_t val, bool fwd) override;
     };
 
-    struct PwmPin: fn::BaseAnalogPin {
+    struct PwmPin: outputs::BaseAnalogPin {
         size_t pin;
         size_t idx;
         PWM *owner;
@@ -272,7 +272,7 @@ namespace nrf {
         size_t available_pins() { return NUM_PINS - pins.size(); }
     };
 
-    class Pin: public fn::BasePin {
+    class Pin: public outputs::BasePin {
     public:
         size_t pin;
         Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
@@ -287,7 +287,7 @@ void nrf::Servo::set_us(uint16_t us) {
     owner->set_us(index, us);
 };
 
-void nrf::HBridge::set(uint8_t val, bool fwd) {
+void nrf::HBridge::set_raw(uint8_t val, bool fwd) {
     owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
 };
 

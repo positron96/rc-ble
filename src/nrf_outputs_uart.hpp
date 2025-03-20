@@ -1,7 +1,7 @@
 #ifndef NRF_FUNCTIONS_UART_H_
 #define NRF_FUNCTIONS_UART_H_
 
-#include "functions.h"
+#include <outputs.hpp>
 
 #include <nrf_uarte.h>
 
@@ -12,7 +12,7 @@ namespace nrf {
      *
      * The output format is "P1=200\n", where 1 is pin nimber and 200 is PWM value.
      */
-    struct UartAnalogPin: fn::BaseAnalogPin {
+    struct UartAnalogPin: outputs::BaseAnalogPin {
         size_t remote_pin;
         NRF_UARTE_Type *uart;
         int16_t last_val;

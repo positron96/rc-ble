@@ -5,7 +5,7 @@
 #ifndef NRF_PDM_H_
 #define NRF_PDM_H_
 
-#include "functions.h"
+#include <outputs.hpp>
 
 #include <nrf_gpio.h>
 
@@ -31,7 +31,7 @@ namespace nrf {
      * Call `tick()` at decent frequency.
      * For LEDs should be at least 1KHz.
      */
-    class PdmPin: public fn::BaseAnalogPin {
+    class PdmPin: public outputs::BaseAnalogPin {
     private:
         constexpr static uint8_t P = 255;
         size_t pin;
