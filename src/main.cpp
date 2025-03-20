@@ -54,12 +54,14 @@ nrf::Pin pin_light_main_hw{D1};
 //nrf::PdmPin pin_light_main{D1};
 
 nrf::PwmPin pin_light_rear_red{D2};
-nrf::Pin pin_light_reverse{D3};
+nrf::Pin pin_light_rev_hw{D3};
+nrf::UartAnalogPin pin_light_rev_uart{4};
 nrf::UartAnalogPin pin_light_main_uart{3};
 
 outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
 outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
+outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
@@ -67,14 +69,14 @@ fn::Blinker bl_right{&pin_light_right};
 nrf::UartAnalogPin pin_brake_uart{2};
 outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
 
-fn::Driving driver{&hbridge, &pin_light_reverse, &pin_brake};
+fn::Driving driver{&hbridge, &pin_light_rev, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 //fn::Simple marker_light{&pin_light_marker};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
-nrf::UartOutputs<4> uart_pins;
+nrf::UartOutputs<5> uart_pins;
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
@@ -103,6 +105,7 @@ void setup() {
     uart_pins.add_pin(pin_light_right_uart);
     uart_pins.add_pin(pin_light_main_uart);
     uart_pins.add_pin(pin_brake_uart);
+    uart_pins.add_pin(pin_light_rev_uart);
 
     functions.push_back(&driver);
 
