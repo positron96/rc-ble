@@ -21,6 +21,7 @@
 #include "ble_sd.h"
 #include "bootloader.h"
 #include "storage.h"
+#include "uart.hpp"
 
 #define delay nrf_delay_ms
 
@@ -49,17 +50,16 @@ nrf::UartAnalogPin pin_light_right_uart{1, NRF_UARTE0};
 outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
 outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
 
-nrf::Pin pin_light_main{D1};
+nrf::Pin pin_light_main_hw{D1};
 //nrf::PdmPin pin_light_main{D1};
 
 nrf::PwmPin pin_light_rear_red{D2};
 nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_marker_side{D4};
 nrf::UartAnalogPin pin_light_marker_uart{3, NRF_UARTE0};
 
 outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-outputs::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32), &pin_light_marker_uart};
+outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_marker_uart};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
@@ -70,7 +70,7 @@ outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart
 fn::Driving driver{&hbridge, &pin_light_reverse, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
-fn::Simple marker_light{&pin_light_marker};
+//fn::Simple marker_light{&pin_light_marker};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
@@ -85,6 +85,11 @@ uint32_t millis(void) {
 
 
 void setup() {
+    uart::init(UART_PIN);
+    log_init();
+    logln("\nStarting");
+    app_timer_init();
+
     ret_code_t err_code = nrf_sdh_enable_request();
     APP_ERROR_CHECK(err_code);
 
@@ -103,7 +108,7 @@ void setup() {
 
     functions.push_back(&steering);
     functions.push_back(&main_light);
-    functions.push_back(&marker_light);
+    //functions.push_back(&marker_light);
 
     servo_timer.init();
     pwm.init();
@@ -121,9 +126,8 @@ etl::expected<T, etl::to_arithmetic_status> parse(const etl::string_view &str) {
 
 #define FMT_SV(sv)  (int)((sv).length()), (sv).data()
 
-void process_str(const char* buf, size_t len) {
-    // logf("processing '%s'(%d)\n", buf, len);
-    etl::string_view in{buf, len};
+void process_str(etl::string_view in) {
+    //logf("processing '%.*s'\n", FMT_SV(in));
     if(in.starts_with("!")) {
         if (in.compare("!dfu") == 0) {
             reboot_to_bootloader();
@@ -144,37 +148,42 @@ void process_str(const char* buf, size_t len) {
         if(in.starts_with("!name=")) {
             const auto new_name = in.substr(6);
             storage::set_dev_name(new_name);
-            logf("name set to '%.*s'[%d]", FMT_SV(in), in.length());
+            logf("name set to '%.*s'[%d]", FMT_SV(new_name), new_name.length());
         } else {
-            logf("Unknown cmd: '%s'\n", buf);
+            logf("Unknown cmd: '%.*s'\n", FMT_SV(in));
         }
         return;
     }
     etl::optional<etl::string_view> token;
     token = etl::get_token(in, "=", token, true);
     if(!token) {
-        logf("no ch: '%s'\n", buf);
+        logf("no '=': '%.*s'\n", FMT_SV(in));
         return;
     }
-    const auto ch_num = parse(token.value());
-    if(!ch_num.has_value()) {
-        logf("ch parsing failed: '%s'\n", buf);
+    const auto ch_opt = parse(token.value());
+    if(!ch_opt.has_value()) {
+        logf("bad ch: '%.*s'\n", FMT_SV(in));
+        return;
+    }
+    const auto ch_num = ch_opt.value();
+    if(ch_num >= functions.size()) {
+        logf("bad ch: %d\n", ch_num);
         return;
     }
 
     token = etl::get_token(in, ", ", token, true);
     if(!token) {
-        logf("no val: '%s'\n", buf);
+        logf("no val: '%.*s'\n", FMT_SV(in));
         return;
     }
 
-    const auto val = parse(token.value());
-    if(!val.has_value()) {
-        logf("val parsing failed: '%s'\n", buf);
+    const auto val_opt = parse(token.value());
+    if(!val_opt.has_value()) {
+        logf("val parsing failed: '%.*s'\n", FMT_SV(in));
         return;
     }
-    //logf("ch %d = %d\n", ch_num.value(), val.value());
-    functions[ch_num.value()]->set(val.value());
+    if(ch_num>1) logf("ch %d = %d\n", ch_num, val_opt.value());
+    functions[ch_num]->set(val_opt.value());
 
 }
 
@@ -278,10 +287,6 @@ APP_TIMER_DEF(m_battery_timer);
 // }
 
 int main() {
-    log_init();
-    logln("\nStarting");
-    app_timer_init();
-
     setup();
     update_battery(nullptr);
 

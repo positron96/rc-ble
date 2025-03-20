@@ -23,7 +23,8 @@ constexpr size_t bufsize = 128;
 char txbuf[bufsize];
 
 void log_init() {
-    uart::init();
+    if(!uart::is_inited())
+        uart::init();
 }
 
 void logs(const char* msg) {
@@ -92,12 +93,19 @@ void logln(const char* msg) {
     SEGGER_RTT_PutChar(0, '\n');
 }
 
-extern "C" int SEGGER_RTT_vprintf(unsigned , const char *, va_list *);
+constexpr size_t bufsize = 128;
+char txbuf[bufsize];
+
+/** Not reentrant! */
+void vlogf(const char * fmt, va_list args) {
+    vsnprintf(txbuf, bufsize, fmt, args);
+    logs(txbuf);
+}
 
 void logf(const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    SEGGER_RTT_vprintf(0, fmt, &args);
+    vlogf(fmt, args);
     va_end(args);
 }
 
@@ -135,9 +143,9 @@ void logf(const char * fmt, ...) {
 
 #else
 
+void log_init() {}
 void logs(const char* msg) {}
 void logln(const char* msg) {}
-void vlogf(const char * fmt, va_list args) {}
 void logf(const char * fmt, ...) {}
 
 #endif

@@ -78,7 +78,7 @@ size_t get_connected_clients_count() {
 }
 
 
-extern void process_str(const char* buf, size_t len);
+extern void process_str(etl::string_view);
 
 using BLELineProcessor = line_processor::LineProcessor<NRF_UART_RX_BUFFER_SIZE>;
 BLELineProcessor rx(line_processor::callback_t::create<process_str>());

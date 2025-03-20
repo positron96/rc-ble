@@ -11,16 +11,15 @@ namespace uart {
 
     NRF_UARTE_Type *uart_inst = NRF_UARTE0;
 
-    // only present on dev module, not on ble-rc board.
-    // set to 0xFFFFFFFF to not use pin
-    constexpr size_t PIN_TX = 18;
-    constexpr size_t PIN_RX = 15;
-
-    void init() {
-        nrf_uarte_txrx_pins_set(uart_inst, PIN_TX, PIN_RX);
+    void init(size_t pin_tx, size_t pin_rx) {
+        nrf_uarte_txrx_pins_set(uart_inst, pin_tx, pin_rx);
         nrf_uarte_baudrate_set(uart_inst, NRF_UARTE_BAUDRATE_115200);
         nrf_uarte_configure(uart_inst, NRF_UARTE_PARITY_EXCLUDED, NRF_UARTE_HWFC_DISABLED);
         nrf_uarte_enable(uart_inst);
+    }
+
+    bool is_inited() {
+        return uart_inst->ENABLE == UARTE_ENABLE_ENABLE_Enabled;
     }
 
     void write(const char* msg, size_t len) {
