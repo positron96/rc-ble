@@ -14,138 +14,119 @@
   #define LOG_TARGET  LOG_UART
 #endif
 
-#if (LOG_TARGET == LOG_UART)
-
-#include "uart.hpp"
-
-
-constexpr size_t bufsize = 128;
-char txbuf[bufsize];
-
-void log_init() {
-    if(!uart::is_inited())
-        uart::init();
-}
-
-void logs(const char* msg) {
-    size_t l = strlen(msg);
-    if(l>bufsize) l = bufsize;
-    if(msg != txbuf) {
-        memcpy(txbuf, msg, l);
-    }
-    uart::write(txbuf, l);
-}
-
-void logln(const char* msg) {
+void _logln(const char* msg) {
     logs(msg);
     logs("\n");
 }
 
-/** Not reentrant! */
-void vlogf(const char * fmt, va_list args) {
-    vsnprintf(txbuf, bufsize, fmt, args);
-    logs(txbuf);
-}
+#if (LOG_TARGET == LOG_UART)
 
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vlogf(fmt, args);
-    va_end(args);
-}
+    #include "uart.hpp"
 
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
 
-// void logs(const char* msg) {
-//     puts(msg);
+    void log_init() {
+        if(!uart::is_inited())
+            uart::init();
+    }
 
-// }
+    void logs(const char* msg) {
+        size_t l = strlen(msg);
+        if(l>bufsize) l = bufsize;
+        if(msg != txbuf) {
+            memcpy(txbuf, msg, l);
+        }
+        uart::write(txbuf, l);
+    }
 
-// void logln(const char* msg) {
-//     printf("%s", msg);
-// }
+    void logln(const char* msg) {
+        _logln(msg);
+    }
 
-// /** Not reentrant! */
-// void vlogf(const char * fmt, va_list args) {
-//     vprintf(fmt, args);
-// }
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
 
-// void logf(const char * fmt, ...) {
-//     va_list args;
-//     va_start(args, fmt);
-//     vlogf(fmt, args);
-//     va_end(args);
-// }
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
+
 
 #elif (LOG_TARGET == LOG_RTT)
 
-#include "SEGGER_RTT.h"
+    #include "SEGGER_RTT.h"
 
-void log_init() {
-    SEGGER_RTT_Init();
-}
+    void log_init() {
+        SEGGER_RTT_Init();
+    }
 
-void logs(const char* msg) {
-    SEGGER_RTT_WriteString(0, msg);
-}
+    void logs(const char* msg) {
+        SEGGER_RTT_WriteString(0, msg);
+    }
 
-void logln(const char* msg) {
-    SEGGER_RTT_WriteString(0, msg);
-    SEGGER_RTT_PutChar(0, '\n');
-}
+    void logln(const char* msg) {
+        SEGGER_RTT_WriteString(0, msg);
+        SEGGER_RTT_PutChar(0, '\n');
+    }
 
-constexpr size_t bufsize = 128;
-char txbuf[bufsize];
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
 
-/** Not reentrant! */
-void vlogf(const char * fmt, va_list args) {
-    vsnprintf(txbuf, bufsize, fmt, args);
-    logs(txbuf);
-}
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
 
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vlogf(fmt, args);
-    va_end(args);
-}
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
 
 #elif (LOG_TARGET == LOG_BLE)
 
-void log_init() {
-}
+    void log_init() {
+    }
 
-extern void send_ble(const char* msg, const size_t len);
+    extern void send_ble(const char* msg, const size_t len);
 
-void logs(const char* msg) {
-    send_ble(msg, strlen(msg));
-}
+    void logs(const char* msg) {
+        send_ble(msg, strlen(msg));
+    }
 
-void logln(const char* msg) {
-    logs(msg);
-    logs("\n");
-}
+    void logln(const char* msg) {
+        _logln(msg);
+    }
 
-constexpr size_t bufsize = 128;
-char txbuf[bufsize];
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
 
-/** Not reentrant! */
-void vlogf(const char * fmt, va_list args) {
-    vsnprintf(txbuf, bufsize, fmt, args);
-    logs(txbuf);
-}
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
 
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vlogf(fmt, args);
-    va_end(args);
-}
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
 
 #else
 
-void log_init() {}
-void logs(const char* msg) {}
-void logln(const char* msg) {}
-void logf(const char * fmt, ...) {}
+    void log_init() {}
+    void logs(const char* msg) {}
+    void logln(const char* msg) {}
+    void logf(const char * fmt, ...) {}
 
 #endif
