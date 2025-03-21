@@ -207,6 +207,8 @@ namespace nrf {
             hbr.owner = this;
             pins.push_back(hbr.pin1);
             pins.push_back(hbr.pin2);
+            data[hbr.index] = PWM_ZERO;
+            data[hbr.index+1] = PWM_ZERO;
             return true;
         }
 
@@ -215,6 +217,7 @@ namespace nrf {
             pin.idx = pins.size();
             pin.owner = this;
             pins.push_back(pin.pin);
+            data[pin.idx] = PWM_ZERO;
             return true;
         }
 
@@ -284,13 +287,16 @@ namespace nrf {
 };
 
 void nrf::Servo::set_us(uint16_t us) {
-    owner->set_us(index, us);
+    if(owner!=nullptr)
+        owner->set_us(index, us);
 };
 
 void nrf::HBridge::set_raw(uint8_t val, bool fwd) {
-    owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
+    if(owner!=nullptr)
+        owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
 };
 
 void nrf::PwmPin::set_pwm(uint8_t val) {
-    owner->set_pwm(val, idx);
+    if(owner!=nullptr)
+        owner->set_pwm(val, idx);
 };
