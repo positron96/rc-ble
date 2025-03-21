@@ -52,6 +52,24 @@ namespace nrf {
         }
     };
 
+#ifdef NO_UART_PINS
+
+    template<size_t MAX_PINS>
+    class UartOutputs: public fn::Ticking, public BaseUartPinOutput {
+    public:
+        constexpr static size_t REFRESH_INTERVAL = ms_to_ticks(1000);
+
+        bool add_pin(UartAnalogPin &pin) {
+            return true;
+        }
+
+        void tick() override { }
+
+        void send_pin(UartAnalogPin *p) override {  }
+
+    };
+
+#else
 
     template<size_t MAX_PINS>
     class UartOutputs: public fn::Ticking, public BaseUartPinOutput {
@@ -112,6 +130,8 @@ namespace nrf {
         size_t ticks_left = REFRESH_INTERVAL;
         //NRF_UARTE_Type *uart;
     };
+
+#endif
 
 };
 
