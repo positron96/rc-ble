@@ -18,7 +18,7 @@
 #include "nrf_outputs_uart.hpp"
 #include "line_processor.h"
 #include "battery.h"
-#include "ble_sd.h"
+#include "ble_sd.hpp"
 #include "bootloader.h"
 #include "storage.hpp"
 #include "uart.hpp"
@@ -123,7 +123,7 @@ void setup() {
     servo_timer.init();
     pwm.init();
 
-    ble_start();
+    ble::start();
 }
 
 template<typename T = uint8_t>
@@ -157,8 +157,14 @@ void process_str(etl::string_view in) {
         } else
         if(in.starts_with("!name=")) {
             const auto new_name = in.substr(6);
-            storage::set_dev_name(new_name);
-            logf("name set to '%.*s'[%d]", FMT_SV(new_name), new_name.length());
+            logf("name:='%.*s'[%d]\n", FMT_SV(new_name), new_name.length());
+            bool v = storage::set_dev_name(new_name);
+            if(v) {
+                ble::update_dev_name();
+            } else {
+                logf("set name failed\n");
+            }
+
         } else {
             logf("Unknown cmd: '%.*s'\n", FMT_SV(in));
         }
@@ -210,7 +216,7 @@ void update_battery(void * p_context) {
     // v = map(v, 3300, 4200, 0, 100);
     //v = map(v, 0, 3000, 0, 100);
     v = v / 100; // 3000mV -> 30
-    set_bas(v);
+    ble::set_bas(v);
 }
 
 
@@ -230,7 +236,7 @@ void timer_tick(void * p_context) {
     static size_t disconnect_time = 0;
     static size_t ticks;
 
-    size_t clients = get_connected_clients_count();
+    size_t clients = ble::get_connected_clients_count();
 
     if(clients == 0 && last_clients != 0) {
         for(auto &fn: functions) fn->sleep();
