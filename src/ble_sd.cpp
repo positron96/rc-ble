@@ -93,8 +93,7 @@ void set_bas(uint8_t battery_level) {
         (err_code != NRF_ERROR_FORBIDDEN) &&
         (err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-       )
-    {
+    ) {
         APP_ERROR_HANDLER(err_code);
     }
 }
@@ -108,9 +107,9 @@ void send_ble(const char* msg, const size_t len) {
     uint32_t err_code = ble_nus_data_send(&m_nus, d, &l, m_conn_handle);
     if ((err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != NRF_ERROR_RESOURCES) &&
-        (err_code != NRF_ERROR_NOT_FOUND))
-    {
-        APP_ERROR_CHECK(err_code);
+        (err_code != NRF_ERROR_NOT_FOUND)
+    ) {
+        APP_ERROR_HANDLER(err_code);
     }
 }
 
