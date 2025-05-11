@@ -22,19 +22,58 @@ namespace uart {
         return uart_inst->ENABLE == UARTE_ENABLE_ENABLE_Enabled;
     }
 
-    void write(const char* msg, size_t len) {
+    /** Sends data to UART using EasyDMA.
+     * Make sure data is in RAM!
+     */
+    void write_ram(const char* msg, size_t len) {
         nrf_uarte_tx_buffer_set(uart_inst, (uint8_t*)msg, len);
         nrf_uarte_task_trigger(uart_inst, NRF_UARTE_TASK_STARTTX);
         while(!nrf_uarte_event_check(uart_inst, NRF_UARTE_EVENT_ENDTX)) {}
         nrf_uarte_event_clear(uart_inst, NRF_UARTE_EVENT_ENDTX);
     }
 
+    void write_cpy(const char* msg, size_t len) {
+        constexpr size_t bufsize = 128;
+        char buf[bufsize];
+        if (len>bufsize) len = bufsize;
+        memcpy(buf, msg, len);
+        write_ram(buf, len);
+    }
+
+    void write(const char* msg, size_t len) {
+        const uintptr_t  p = (const uintptr_t)msg;
+        if(p>=0x2000000 && p<0x3FFFFFFF) { // full 0.5GB of SRAM
+            write_ram(msg, len);
+        } else {
+            write_cpy(msg, len);
+        }
+    }
+
     void puts(const char* msg) {
         size_t l = strlen(msg);
-        // if(nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_TXSTARTED)) {
-        //     nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_TXSTARTED);
-        // }
         write(msg, l);
+    }
+
+    void puts(const etl::string_view &msg) {
+        constexpr size_t bufsize = 64;
+        char buf[bufsize];
+        snprintf(buf, sizeof(buf), "%.*s", msg.length(), msg.data());
+        size_t l = strlen(buf);
+        write(buf, l);
+    }
+
+    void vprintf(const char * fmt, va_list args) {
+        constexpr size_t bufsize = 64;
+        char buf[bufsize];
+        vsnprintf(buf, bufsize, fmt, args);
+        write(buf, strlen(buf));
+    }
+
+    void printf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vprintf(fmt, args);
+        va_end(args);
     }
 
 }

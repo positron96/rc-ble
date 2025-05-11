@@ -1,6 +1,8 @@
 #ifndef UART_HPP_
 #define UART_HPP_
 
+#include <etl/string_view.h>
+
 #include <cstddef>
 
 namespace uart {
@@ -14,6 +16,9 @@ namespace uart {
     bool is_inited();
     void puts(const char* msg);
     void write(const char* msg, size_t len);
+
+    void puts(const etl::string_view &msg);
+    void printf(const char * fmt, ...);
 }
 
 #endif // UART_HPP_

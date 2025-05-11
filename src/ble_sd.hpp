@@ -14,6 +14,8 @@ namespace ble {
     void set_bas(uint8_t);
 
     void update_dev_name();
+
+    void transmit(const char* msg, const size_t len);
 }
 
 #endif // BLE_SD_HPP_

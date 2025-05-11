@@ -94,8 +94,9 @@ uint32_t millis(void) {
 
 void setup() {
     uart::init(UART_PIN);
+    uart::puts("uart init\n");
     log_init();
-    logln("\nStarting");
+    logs("\nBLE-RC\n");
     app_timer_init();
 
     ret_code_t err_code = nrf_sdh_enable_request();

@@ -98,14 +98,15 @@ void set_bas(uint8_t battery_level) {
     }
 }
 
-void send_ble(const char* msg, const size_t len) {
+void transmit(const char* msg, const size_t len) {
     if(m_conn_handle == BLE_CONN_HANDLE_INVALID) {
         return;
     }
     uint16_t l = len;
     uint8_t* d = (uint8_t*)msg;
     uint32_t err_code = ble_nus_data_send(&m_nus, d, &l, m_conn_handle);
-    if ((err_code != NRF_ERROR_INVALID_STATE) &&
+    if ((err_code != NRF_SUCCESS) &&
+        (err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != NRF_ERROR_RESOURCES) &&
         (err_code != NRF_ERROR_NOT_FOUND)
     ) {
@@ -428,6 +429,8 @@ void start() {
 
 }
 
+#include "uart.hpp"
+
 extern "C" {
 
     static void on_error(void) {
@@ -438,17 +441,17 @@ extern "C" {
     }
 
     void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name) {
-        logf("error err_code:%d %s:%d\n", error_code, p_file_name, line_num);
+        uart::printf("error err_code:%d %s:%d\n", error_code, p_file_name, line_num);
         on_error();
     }
 
     void app_error_handler_bare(uint32_t error_code) {
-        logf("error_bare: 0x%08x!\n", error_code);
+        uart::printf("error_bare: 0x%08x!\n", error_code);
         on_error();
     }
 
     void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
-        logf("fault 0x%08x, pc: 0x%08x, info: 0x%08x\n", id, pc, info);
+        uart::printf("fault 0x%08x, pc: 0x%08x, info: 0x%08x\n", id, pc, info);
         on_error();
     }
 

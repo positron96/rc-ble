@@ -27,8 +27,9 @@ void _logln(const char* msg) {
     char txbuf[bufsize];
 
     void log_init() {
-        if(!uart::is_inited())
+        if(!uart::is_inited()) {
             uart::init();
+        }
     }
 
     void logs(const char* msg) {
@@ -93,13 +94,15 @@ void _logln(const char* msg) {
 
 #elif (LOG_TARGET == LOG_BLE)
 
+    #include "ble_sd.hpp"
+
     void log_init() {
     }
 
-    extern void send_ble(const char* msg, const size_t len);
+    //extern void send_ble(const char* msg, const size_t len);
 
     void logs(const char* msg) {
-        send_ble(msg, strlen(msg));
+        ble::transmit(msg, strlen(msg));
     }
 
     void logln(const char* msg) {
