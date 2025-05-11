@@ -10,7 +10,7 @@
 
 namespace line_processor {
 
-    using callback_t =  etl::delegate<void(const char*, size_t)>;
+    using callback_t =  etl::delegate<void(etl::string_view)>;
 
     /**
      * Splits input stream into lines and feeds lines into callback function.
@@ -20,17 +20,16 @@ namespace line_processor {
     public:
 
         LineProcessor(callback_t cb): cb{cb} {
-
         }
 
-        void add(char c) {
-            if(c == '\n') {
-                buf[pos] = 0;
-                cb(buf.data(), pos);
+        void add(char rd) {
+            if(rd=='\n') {
+                if(pos>0 && buf[pos-1]=='\r') pos--;
+                cb(etl::string_view{buf.data(), pos});
                 pos = 0;
             } else {
                 if(pos<BUF_SIZE) {
-                    buf[pos++] = c;
+                    buf[pos++] = rd;
                 } else {
                     pos = 0;
                     logs("Buffer overflow!\n");

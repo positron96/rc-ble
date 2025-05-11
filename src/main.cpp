@@ -11,14 +11,17 @@
 #include <etl/expected.h>
 
 
-#include "functions.h"
-#include "nrf_functions.h"
-#include "nrf_functions_pdm.h"
+#include <outputs.hpp>
+#include <functions/car_functions.hpp>
+#include "nrf_outputs.hpp"
+#include "nrf_outputs_pdm.hpp"
+#include "nrf_outputs_uart.hpp"
 #include "line_processor.h"
 #include "battery.h"
-#include "ble_sd.h"
+#include "ble_sd.hpp"
 #include "bootloader.h"
-#include "storage.h"
+#include "storage.hpp"
+#include "uart.hpp"
 
 #define delay nrf_delay_ms
 
@@ -40,29 +43,40 @@ constexpr size_t M2 = 28;
 
 nrf::HBridge hbridge{M1, M2};
 nrf::Servo steer_servo{D7};
-nrf::Pin pin_light_left{D5};
-nrf::Pin pin_light_right{D6};
-nrf::Pin pin_light_main{D1};
+nrf::Pin pin_light_left_hw{D5};
+nrf::Pin pin_light_right_hw{D6};
+nrf::UartAnalogPin pin_light_left_uart{0};
+nrf::UartAnalogPin pin_light_right_uart{1};
+outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
+outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
+
+nrf::Pin pin_light_main_hw{D1};
 //nrf::PdmPin pin_light_main{D1};
 
 nrf::PwmPin pin_light_rear_red{D2};
-nrf::Pin pin_light_reverse{D3};
-nrf::Pin pin_light_marker_side{D4};
+nrf::Pin pin_light_rev_hw{D3};
+nrf::UartAnalogPin pin_light_rev_uart{4};
+nrf::UartAnalogPin pin_light_main_uart{3};
 
-fn::MultiInputPin pin_light_red{&pin_light_rear_red};
+outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-fn::MultiOutputPin pin_light_marker{&pin_light_marker_side, pin_light_red.create_pin(32)};
+outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
+outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
-fn::Driving driver{&hbridge, &pin_light_reverse, pin_light_red.create_pin(255)};
+nrf::UartAnalogPin pin_brake_uart{2};
+outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
+
+fn::Driving driver{&hbridge, &pin_light_rev, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
-fn::Simple marker_light{&pin_light_marker};
+//fn::Simple marker_light{&pin_light_marker};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
+nrf::UartOutputs<5> uart_pins;
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
@@ -74,12 +88,24 @@ uint32_t millis(void) {
 
 
 void setup() {
+    uart::init(UART_PIN);
+    log_init();
+    logln("\nStarting");
+    app_timer_init();
+
     ret_code_t err_code = nrf_sdh_enable_request();
     APP_ERROR_CHECK(err_code);
 
     storage::init();
+
     pwm.add_hbridge(hbridge);
     pwm.add_pin(pin_light_rear_red);
+
+    uart_pins.add_pin(pin_light_left_uart);
+    uart_pins.add_pin(pin_light_right_uart);
+    uart_pins.add_pin(pin_light_main_uart);
+    uart_pins.add_pin(pin_brake_uart);
+    uart_pins.add_pin(pin_light_rev_uart);
 
     functions.push_back(&driver);
 
@@ -92,12 +118,12 @@ void setup() {
 
     functions.push_back(&steering);
     functions.push_back(&main_light);
-    functions.push_back(&marker_light);
+    //functions.push_back(&marker_light);
 
     servo_timer.init();
     pwm.init();
 
-    ble_start();
+    ble::start();
 }
 
 template<typename T = uint8_t>
@@ -110,9 +136,8 @@ etl::expected<T, etl::to_arithmetic_status> parse(const etl::string_view &str) {
 
 #define FMT_SV(sv)  (int)((sv).length()), (sv).data()
 
-void process_str(const char* buf, size_t len) {
-    // logf("processing '%s'(%d)\n", buf, len);
-    etl::string_view in{buf, len};
+void process_str(etl::string_view in) {
+    //logf("processing '%.*s'\n", FMT_SV(in));
     if(in.starts_with("!")) {
         if (in.compare("!dfu") == 0) {
             reboot_to_bootloader();
@@ -132,38 +157,49 @@ void process_str(const char* buf, size_t len) {
         } else
         if(in.starts_with("!name=")) {
             const auto new_name = in.substr(6);
-            storage::set_dev_name(new_name);
-            logf("name set to '%.*s'[%d]", FMT_SV(in), in.length());
+            logf("name:='%.*s'[%d]\n", FMT_SV(new_name), new_name.length());
+            bool v = storage::set_dev_name(new_name);
+            if(v) {
+                ble::update_dev_name();
+            } else {
+                logf("set name failed\n");
+            }
+
         } else {
-            logf("Unknown cmd: '%s'\n", buf);
+            logf("Unknown cmd: '%.*s'\n", FMT_SV(in));
         }
         return;
     }
     etl::optional<etl::string_view> token;
     token = etl::get_token(in, "=", token, true);
     if(!token) {
-        logf("no ch: '%s'\n", buf);
+        logf("no '=': '%.*s'\n", FMT_SV(in));
         return;
     }
-    const auto ch_num = parse(token.value());
-    if(!ch_num.has_value()) {
-        logf("ch parsing failed: '%s'\n", buf);
+    const auto ch_opt = parse(token.value());
+    if(!ch_opt.has_value()) {
+        logf("bad ch: '%.*s'\n", FMT_SV(in));
+        return;
+    }
+    const auto ch_num = ch_opt.value();
+    if(ch_num >= functions.size()) {
+        logf("bad ch: %d\n", ch_num);
         return;
     }
 
     token = etl::get_token(in, ", ", token, true);
     if(!token) {
-        logf("no val: '%s'\n", buf);
+        logf("no val: '%.*s'\n", FMT_SV(in));
         return;
     }
 
-    const auto val = parse(token.value());
-    if(!val.has_value()) {
-        logf("val parsing failed: '%s'\n", buf);
+    const auto val_opt = parse(token.value());
+    if(!val_opt.has_value()) {
+        logf("val parsing failed: '%.*s'\n", FMT_SV(in));
         return;
     }
-    //logf("ch %d = %d\n", ch_num.value(), val.value());
-    functions[ch_num.value()]->set(val.value());
+    if(ch_num>1) logf("ch %d = %d\n", ch_num, val_opt.value());
+    functions[ch_num]->set(val_opt.value());
 
 }
 
@@ -180,7 +216,7 @@ void update_battery(void * p_context) {
     // v = map(v, 3300, 4200, 0, 100);
     //v = map(v, 0, 3000, 0, 100);
     v = v / 100; // 3000mV -> 30
-    set_bas(v);
+    ble::set_bas(v);
 }
 
 
@@ -200,7 +236,7 @@ void timer_tick(void * p_context) {
     static size_t disconnect_time = 0;
     static size_t ticks;
 
-    size_t clients = get_connected_clients_count();
+    size_t clients = ble::get_connected_clients_count();
 
     if(clients == 0 && last_clients != 0) {
         for(auto &fn: functions) fn->sleep();
@@ -251,7 +287,7 @@ void timer_tick(void * p_context) {
     ticks++;
     bl_right.tick();
     bl_left.tick();
-
+    uart_pins.tick();
 }
 
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
@@ -267,10 +303,6 @@ APP_TIMER_DEF(m_battery_timer);
 // }
 
 int main() {
-    log_init();
-    logln("\nStarting");
-    app_timer_init();
-
     setup();
     update_battery(nullptr);
 

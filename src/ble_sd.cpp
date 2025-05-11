@@ -1,26 +1,25 @@
-#ifndef BLE_SD_H_
-#define BLE_SD_H_
+#include "ble_sd.hpp"
 
-#include <stdint.h>
 #include "nordic_common.h"
 #include "nrf.h"
 
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_params.h"
-#include "nrf_sdh.h"
+
 #include "nrf_sdh_soc.h"
 #include "nrf_sdh_ble.h"
 #include "nrf_ble_gatt.h"
 #include "ble_nus.h"
 #include "ble_bas.h"
 #include "app_timer.h"
+#include <app_util_platform.h>
 
 #include <nrf_log.h>
 #include <nrf_log_ctrl.h>
 #include <nrf_log_default_backends.h>
 
-#include "storage.h"
+#include "storage.hpp"
 #include "line_processor.h"
 #include "log.h"
 
@@ -72,13 +71,15 @@ static ble_uuid_t m_adv_uuids[]          = {
 //     while(1){ }
 // }
 
+extern void process_str(etl::string_view);
+
+namespace ble {
+
 
 size_t get_connected_clients_count() {
     return m_conn_handle == BLE_CONN_HANDLE_INVALID ? 0 : 1;
 }
 
-
-extern void process_str(const char* buf, size_t len);
 
 using BLELineProcessor = line_processor::LineProcessor<NRF_UART_RX_BUFFER_SIZE>;
 BLELineProcessor rx(line_processor::callback_t::create<process_str>());
@@ -92,8 +93,7 @@ void set_bas(uint8_t battery_level) {
         (err_code != NRF_ERROR_FORBIDDEN) &&
         (err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-       )
-    {
+    ) {
         APP_ERROR_HANDLER(err_code);
     }
 }
@@ -107,9 +107,9 @@ void send_ble(const char* msg, const size_t len) {
     uint32_t err_code = ble_nus_data_send(&m_nus, d, &l, m_conn_handle);
     if ((err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != NRF_ERROR_RESOURCES) &&
-        (err_code != NRF_ERROR_NOT_FOUND))
-    {
-        APP_ERROR_CHECK(err_code);
+        (err_code != NRF_ERROR_NOT_FOUND)
+    ) {
+        APP_ERROR_HANDLER(err_code);
     }
 }
 
@@ -270,7 +270,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context) {
 }
 
 
-static void ble_stack_init(void) {
+static void stack_init(void) {
     ret_code_t err_code;
 
     if(!nrf_sdh_is_enabled()) {
@@ -292,13 +292,7 @@ static void ble_stack_init(void) {
     NRF_SDH_BLE_OBSERVER(m_ble_observer, APP_BLE_OBSERVER_PRIO, ble_evt_handler, NULL);
 }
 
-static void gap_params_init(void) {
-    uint32_t                err_code;
-    ble_gap_conn_params_t   gap_conn_params;
-    ble_gap_conn_sec_mode_t sec_mode;
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
-
+void update_dev_name() {
     const auto devname_opt = storage::get_dev_name();
     const char* devname;
     if(devname_opt) {
@@ -306,11 +300,44 @@ static void gap_params_init(void) {
     } else {
         devname = storage::DEFAULT_DEVNAME;
     }
+    //logf("Dev name: '%s'\n", devname);
+
+    ble_gap_conn_sec_mode_t sec_mode;
+    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&sec_mode);
+
+    uint32_t  err_code;
     err_code = sd_ble_gap_device_name_set(
         &sec_mode,
         (const uint8_t *) devname,
         strlen(devname));
     APP_ERROR_CHECK(err_code);
+
+    if(m_advertising.initialized) {
+        // recreate advertising data with new name
+        logf("Updating adv data\n");
+        ble_advdata_t advdata, srdata;
+        memset(&advdata, 0, sizeof(advdata));
+        memset(&srdata, 0, sizeof(srdata));
+
+        advdata.name_type          = BLE_ADVDATA_FULL_NAME;
+        advdata.include_appearance = false;
+        advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+
+        srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
+        srdata.uuids_complete.p_uuids  = m_adv_uuids;
+
+        err_code = ble_advertising_advdata_update(&m_advertising, &advdata, &srdata);
+        if(err_code!=NRF_SUCCESS) {
+            logf("Update adv failed: %d\n", err_code);
+        }
+    }
+}
+
+static void gap_params_init() {
+    uint32_t  err_code;
+    ble_gap_conn_params_t   gap_conn_params;
+
+    update_dev_name();
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
 
@@ -370,13 +397,14 @@ static void advertising_init(void) {
     init.evt_handler = on_adv_evt;
 
     err_code = ble_advertising_init(&m_advertising, &init);
+
     APP_ERROR_CHECK(err_code);
 
     ble_advertising_conn_cfg_tag_set(&m_advertising, APP_BLE_CONN_CFG_TAG);
 }
 
 
-void ble_start() {
+void start() {
     ret_code_t err_code;
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
@@ -385,7 +413,7 @@ void ble_start() {
     NRF_LOG_INFO("Starting BLE");
     logln("Starting BLE/mylog");
 
-    ble_stack_init();
+    stack_init();
     gap_params_init();
     gatt_init();
     services_init();
@@ -398,27 +426,30 @@ void ble_start() {
     NRF_LOG_INFO("BLE started");
 }
 
-static void on_error(void) {
-#ifdef DEBUG
-    NRF_BREAKPOINT_COND;
-#endif
-    NVIC_SystemReset();
 }
 
+extern "C" {
 
-void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name) {
-    logf("error err_code:%d %s:%d\n", error_code, p_file_name, line_num);
-    on_error();
+    static void on_error(void) {
+        #ifdef DEBUG
+            NRF_BREAKPOINT_COND;
+        #endif
+        NVIC_SystemReset();
+    }
+
+    void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t * p_file_name) {
+        logf("error err_code:%d %s:%d\n", error_code, p_file_name, line_num);
+        on_error();
+    }
+
+    void app_error_handler_bare(uint32_t error_code) {
+        logf("error_bare: 0x%08x!\n", error_code);
+        on_error();
+    }
+
+    void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+        logf("fault 0x%08x, pc: 0x%08x, info: 0x%08x\n", id, pc, info);
+        on_error();
+    }
+
 }
-
-void app_error_handler_bare(uint32_t error_code) {
-    logf("error_bare: 0x%08x!\n", error_code);
-    on_error();
-}
-
-void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
-    logf("fault 0x%08x, pc: 0x%08x, info: 0x%08x\n", id, pc, info);
-    on_error();
-}
-
-#endif // BLE_SD_H_

@@ -1,4 +1,4 @@
-#include "storage.h"
+#include "storage.hpp"
 
 #include <cstring>
 
@@ -26,9 +26,8 @@ namespace storage {
     constexpr uint16_t CONFIG_FILE_ID = 0x1;
     constexpr uint16_t REC_DEVNAME_KEY = 0x1;
 
-    devname_t m_devname;
+    devname_t m_devname = "\0";
 
-    /* A record containing dummy configuration data. */
     static fds_record_t const m_devname_rec{
         .file_id           = CONFIG_FILE_ID,
         .key               = REC_DEVNAME_KEY,
@@ -55,7 +54,7 @@ namespace storage {
             case FDS_EVT_WRITE:
             case FDS_EVT_UPDATE: {
                 if (evt->result == NRF_SUCCESS) {
-                    logf("Record ID:\t0x%04x\n",  evt->write.record_id);
+                    logf("W/U Record ID:\t0x%04x\n",  evt->write.record_id);
                     logf("File ID:\t0x%04x\n",    evt->write.file_id);
                     logf("Record key:\t0x%04x\n", evt->write.record_key);
                 }
@@ -64,7 +63,7 @@ namespace storage {
             case FDS_EVT_DEL_FILE:
             case FDS_EVT_DEL_RECORD: {
                 if (evt->result == NRF_SUCCESS) {
-                    logf("Record ID:\t0x%04x\n",  evt->del.record_id);
+                    logf("D Record ID:\t0x%04x\n",  evt->del.record_id);
                     logf("File ID:\t0x%04x\n",    evt->del.file_id);
                     logf("Record key:\t0x%04x\n", evt->del.record_key);
                 }
@@ -74,6 +73,12 @@ namespace storage {
         }
     }
 
+    bool clean() {
+        event_result = -1;
+        ret_code_t rc = fds_gc();
+        if(rc==NRF_SUCCESS) while (event_result==-1)  { (void) sd_app_evt_wait(); }
+        return rc == NRF_SUCCESS && event_result == NRF_SUCCESS;
+    }
 
     void init() {
         ret_code_t rc;
@@ -96,13 +101,11 @@ namespace storage {
         logf(" Res: %dw\n Used: %dw\n Freeable: %dw\n",
             stat.words_reserved, stat.words_used, stat.freeable_words);
 
-    }
+        if(stat.dirty_records > stat.valid_records*10) {
+            // trivial attempt to clean data when there is too many dirty records.
+            clean();
+        }
 
-    bool clean() {
-        event_result = -1;
-        ret_code_t rc = fds_gc();
-        if(rc==NRF_SUCCESS) while (event_result==-1)  { (void) sd_app_evt_wait(); }
-        return rc == NRF_SUCCESS && event_result == NRF_SUCCESS;
     }
 
     bool wipe() {
@@ -118,18 +121,25 @@ namespace storage {
 
 
     etl::optional<etl::string_view> get_dev_name() {
+        if(m_devname[0] != 0) {
+            return etl::string_view{m_devname};
+        }
+
         fds_record_desc_t desc = {0};
         fds_find_token_t tok  = {0};
 
         ret_code_t rc = fds_record_find(CONFIG_FILE_ID, REC_DEVNAME_KEY, &desc, &tok);
 
         if(rc == FDS_ERR_NOT_FOUND) {
+            logf("FDS_ERR_NOT_FOUND\n");
             return etl::nullopt;
-        }
+        } else
         if (rc != NRF_SUCCESS)  {
             logf("fds_record_find failed: %d\n", rc);
             return etl::nullopt;
         }
+
+        logf("Found Rec ID %X\n", desc.record_id);
 
         fds_flash_record_t config = {0};
         rc = fds_record_open(&desc, &config);
@@ -161,26 +171,22 @@ namespace storage {
         fds_find_token_t tok{0};
         ret_code_t rc = fds_record_find(CONFIG_FILE_ID, REC_DEVNAME_KEY, &desc, &tok);
 
+        //event_result = -1;
         if (rc == NRF_SUCCESS)  {
             rc = fds_record_update(&desc, &m_devname_rec);
-            if ((rc != NRF_SUCCESS) && (rc == FDS_ERR_NO_SPACE_IN_FLASH)) {
-                logln("No space in flash");
-                return false;
-            } else {
-                logf("fds_record_update failed: %d\n", rc);
-                return false;
-            }
         } else {
             logln("Creating config file...\n");
-
             rc = fds_record_write(&desc, &m_devname_rec);
-            if (rc == FDS_ERR_NO_SPACE_IN_FLASH)  {
-                logln("No space in flash");
-                return false;
-            } else {
-                logf("fds_record_write failed: %d\n", rc);
-                return false;
-            }
+        }
+        if (rc == NRF_SUCCESS) {
+            //while (event_result==-1)  { (void) sd_app_evt_wait(); }
+            return true;
+        } else if (rc == FDS_ERR_NO_SPACE_IN_FLASH) {
+            logln("No space in flash");
+            return false;
+        } else {
+            logf("fds_record_update failed: %d\n", rc);
+            return false;
         }
 
     }

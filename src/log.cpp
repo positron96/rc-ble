@@ -5,146 +5,128 @@
 #include <cstdarg>
 #include <cstdio>
 
-#define LOG_RTT_
-#define LOG_UART_
-#define LOG_BLE
+#define LOG_UART  1
+#define LOG_RTT   2
+#define LOG_BLE   3
+#define LOG_NONE  0
 
-#ifdef LOG_UART
+#ifndef LOG_TARGET
+  #define LOG_TARGET  LOG_UART
+#endif
 
-#include <nrf_uarte.h>
-
-NRF_UARTE_Type *log_uart = NRF_UARTE0;
-
-constexpr size_t bufsize = 128;
-char txbuf[bufsize];
-
-void log_init() {
-    // only present on dev module, not on ble-rc board.
-    nrf_uarte_txrx_pins_set(log_uart, 18, 15);//15, 18);
-    nrf_uarte_baudrate_set(log_uart, NRF_UARTE_BAUDRATE_115200);
-    nrf_uarte_configure(log_uart, NRF_UARTE_PARITY_EXCLUDED, NRF_UARTE_HWFC_DISABLED);
-    nrf_uarte_enable(log_uart);
-
+void _logln(const char* msg) {
+    logs(msg);
+    logs("\n");
 }
 
-void logs(const char* msg) {
-    size_t l = strlen(msg);
-    if(l>bufsize) l = bufsize;
-    if(msg != txbuf) {
-        memcpy(txbuf, msg, l);
+#if (LOG_TARGET == LOG_UART)
+
+    #include "uart.hpp"
+
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
+
+    void log_init() {
+        if(!uart::is_inited())
+            uart::init();
     }
-    // if(nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_TXSTARTED)) {
-    //     nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_TXSTARTED);
-    // }
-    nrf_uarte_tx_buffer_set(log_uart, (uint8_t*)txbuf, l);
-    nrf_uarte_task_trigger(log_uart, NRF_UARTE_TASK_STARTTX);
-    while(!nrf_uarte_event_check(log_uart, NRF_UARTE_EVENT_ENDTX)) {}
-    nrf_uarte_event_clear(log_uart, NRF_UARTE_EVENT_ENDTX);
-}
 
-void logln(const char* msg) {
-    logs(msg);
-    logs("\n");
-}
+    void logs(const char* msg) {
+        size_t l = strlen(msg);
+        if(l>bufsize) l = bufsize;
+        if(msg != txbuf) {
+            memcpy(txbuf, msg, l);
+        }
+        uart::write(txbuf, l);
+    }
 
-/** Not reentrant! */
-void vlogf(const char * fmt, va_list args) {
-    vsnprintf(txbuf, bufsize, fmt, args);
-    logs(txbuf);
-}
+    void logln(const char* msg) {
+        _logln(msg);
+    }
 
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vlogf(fmt, args);
-    va_end(args);
-}
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
+
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
 
 
-// void logs(const char* msg) {
-//     puts(msg);
+#elif (LOG_TARGET == LOG_RTT)
 
-// }
+    #include "SEGGER_RTT.h"
 
-// void logln(const char* msg) {
-//     printf("%s", msg);
-// }
+    void log_init() {
+        SEGGER_RTT_Init();
+    }
 
-// /** Not reentrant! */
-// void vlogf(const char * fmt, va_list args) {
-//     vprintf(fmt, args);
-// }
+    void logs(const char* msg) {
+        SEGGER_RTT_WriteString(0, msg);
+    }
 
-// void logf(const char * fmt, ...) {
-//     va_list args;
-//     va_start(args, fmt);
-//     vlogf(fmt, args);
-//     va_end(args);
-// }
+    void logln(const char* msg) {
+        SEGGER_RTT_WriteString(0, msg);
+        SEGGER_RTT_PutChar(0, '\n');
+    }
 
-#elif defined(LOG_RTT)
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
 
-#include "SEGGER_RTT.h"
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
 
-void log_init() {
-    SEGGER_RTT_Init();
-}
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
 
-void logs(const char* msg) {
-    SEGGER_RTT_WriteString(0, msg);
-}
+#elif (LOG_TARGET == LOG_BLE)
 
-void logln(const char* msg) {
-    SEGGER_RTT_WriteString(0, msg);
-    SEGGER_RTT_PutChar(0, '\n');
-}
+    void log_init() {
+    }
 
-extern "C" int SEGGER_RTT_vprintf(unsigned , const char *, va_list *);
+    extern void send_ble(const char* msg, const size_t len);
 
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    SEGGER_RTT_vprintf(0, fmt, &args);
-    va_end(args);
-}
+    void logs(const char* msg) {
+        send_ble(msg, strlen(msg));
+    }
 
-#elif defined(LOG_BLE)
+    void logln(const char* msg) {
+        _logln(msg);
+    }
 
-void log_init() {
-}
+    constexpr size_t bufsize = 128;
+    char txbuf[bufsize];
 
-extern void send_ble(const char* msg, const size_t len);
+    /** Not reentrant! */
+    void vlogf(const char * fmt, va_list args) {
+        vsnprintf(txbuf, bufsize, fmt, args);
+        logs(txbuf);
+    }
 
-void logs(const char* msg) {
-    send_ble(msg, strlen(msg));
-}
-
-void logln(const char* msg) {
-    logs(msg);
-    logs("\n");
-}
-
-constexpr size_t bufsize = 128;
-char txbuf[bufsize];
-
-/** Not reentrant! */
-void vlogf(const char * fmt, va_list args) {
-    vsnprintf(txbuf, bufsize, fmt, args);
-    logs(txbuf);
-}
-
-void logf(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vlogf(fmt, args);
-    va_end(args);
-}
+    void logf(const char * fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vlogf(fmt, args);
+        va_end(args);
+    }
 
 #else
 
-void logs(const char* msg) {}
-void logln(const char* msg) {}
-void vlogf(const char * fmt, va_list args) {}
-void logf(const char * fmt, ...) {}
+    void log_init() {}
+    void logs(const char* msg) {}
+    void logln(const char* msg) {}
+    void logf(const char * fmt, ...) {}
 
 #endif

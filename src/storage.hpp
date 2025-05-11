@@ -9,7 +9,7 @@ namespace storage {
     void init();
 
     constexpr size_t DEVNAME_LEN = 64;
-    constexpr char DEFAULT_DEVNAME[] = "MicroRC\xF0\x9F\x9A\x9A";// "NanoRC";
+    constexpr char DEFAULT_DEVNAME[] = "\xF0\x9F\x9A\x9A MicroRC";// "NanoRC";
     etl::optional<etl::string_view> get_dev_name();
     bool set_dev_name(const etl::string_view name);
 
