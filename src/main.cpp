@@ -215,13 +215,13 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 void update_battery(void * p_context) {
     uint32_t v = analogRead(BAT_ADC_CH);
-    //logf("got ADC, %d\n", v);
+    logf("got ADC, %d\n", v);
     v = v * (27+68)/68 * 600 * 5 / 1024;  // mV at VCC, 0.6V ref, 1/5 gain
     //v = v * 600 * 5 / 1024;  // in mV at ADC pin, 0.6V ref, 1/5 gain
-    // v = std::clamp(v, 3300ul, 4200ul);
-    // v = map(v, 3300, 4200, 0, 100);
+    v = std::clamp(v, 3300ul, 4200ul);
+    v = map(v, 3300, 4200, 0, 100);
     //v = map(v, 0, 3000, 0, 100);
-    v = v / 100; // 3000mV -> 30
+    //v = v / 100; // 3000mV -> 30
     ble::set_bas(v);
 }
 
