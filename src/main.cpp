@@ -45,29 +45,34 @@ nrf::HBridge hbridge{M1, M2};
 nrf::Servo steer_servo{D7};
 nrf::Pin pin_light_left_hw{D5};
 nrf::Pin pin_light_right_hw{D6};
-nrf::UartAnalogPin pin_light_left_uart{0};
-nrf::UartAnalogPin pin_light_right_uart{1};
-outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
-outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
+// nrf::UartAnalogPin pin_light_left_uart{0};
+// nrf::UartAnalogPin pin_light_right_uart{1};
+// outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
+// outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
+auto &pin_light_left = pin_light_left_hw;
+auto &pin_light_right = pin_light_right_hw;
 
 nrf::Pin pin_light_main_hw{D1};
 //nrf::PdmPin pin_light_main{D1};
 
 nrf::PwmPin pin_light_rear_red{D2};
 nrf::Pin pin_light_rev_hw{D3};
-nrf::UartAnalogPin pin_light_rev_uart{4};
-nrf::UartAnalogPin pin_light_main_uart{3};
+// nrf::UartAnalogPin pin_light_rev_uart{4};
+// nrf::UartAnalogPin pin_light_main_uart{3};
 
 outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
-outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
+// outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
+// outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
+outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32)};
+outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
 fn::Blinker bl_left{&pin_light_left};
 fn::Blinker bl_right{&pin_light_right};
 
-nrf::UartAnalogPin pin_brake_uart{2};
-outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
+// nrf::UartAnalogPin pin_brake_uart{2};
+// outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
+outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
 
 fn::Driving driver{&hbridge, &pin_light_rev, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
@@ -76,7 +81,7 @@ fn::Simple main_light{&pin_light_main};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
-nrf::UartOutputs<5> uart_pins;
+// nrf::UartOutputs<5> uart_pins;
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
@@ -101,11 +106,11 @@ void setup() {
     pwm.add_hbridge(hbridge);
     pwm.add_pin(pin_light_rear_red);
 
-    uart_pins.add_pin(pin_light_left_uart);
-    uart_pins.add_pin(pin_light_right_uart);
-    uart_pins.add_pin(pin_light_main_uart);
-    uart_pins.add_pin(pin_brake_uart);
-    uart_pins.add_pin(pin_light_rev_uart);
+    // uart_pins.add_pin(pin_light_left_uart);
+    // uart_pins.add_pin(pin_light_right_uart);
+    // uart_pins.add_pin(pin_light_main_uart);
+    // uart_pins.add_pin(pin_brake_uart);
+    // uart_pins.add_pin(pin_light_rev_uart);
 
     functions.push_back(&driver);
 
@@ -287,7 +292,7 @@ void timer_tick(void * p_context) {
     ticks++;
     bl_right.tick();
     bl_left.tick();
-    uart_pins.tick();
+    // uart_pins.tick();
 }
 
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
