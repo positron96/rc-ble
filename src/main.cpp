@@ -74,7 +74,7 @@ fn::Blinker bl_right{&pin_light_right};
 // outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
 outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
 
-fn::Driving driver{&hbridge, &pin_light_rev, &pin_brake};
+fn::SimpleDriving driver{&hbridge, &pin_light_rev, &pin_brake};
 fn::Steering steering{&steer_servo, &bl_left, &bl_right};
 fn::Simple main_light{&pin_light_main};
 //fn::Simple marker_light{&pin_light_marker};
