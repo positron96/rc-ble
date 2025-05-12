@@ -83,6 +83,8 @@ nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
 // nrf::UartOutputs<5> uart_pins;
 
+fn::BinarySelector fn_blinker{&bl_left, &bl_right};
+
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
 };
@@ -125,6 +127,7 @@ void setup() {
     functions.push_back(&steering);
     functions.push_back(&main_light);
     //functions.push_back(&marker_light);
+    functions.push_back(&fn_blinker);
 
     servo_timer.init();
     pwm.init();
