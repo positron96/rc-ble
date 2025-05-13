@@ -245,6 +245,7 @@ namespace nrf {
         };
 
         void set_hbridge(uint8_t val, bool fwd, size_t idx1) {
+            // if(val!=0) logf("%d=%c%d\n", idx1, fwd?'+':'-', val);
             size_t idx2 = idx1+1;
             if(val==0) { // coast
                 data[idx1] = PWM_ZERO;

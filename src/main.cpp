@@ -127,7 +127,9 @@ void setup() {
     functions.push_back(&steering);
     functions.push_back(&main_light);
     //functions.push_back(&marker_light);
-    functions.push_back(&fn_blinker);
+    //functions.push_back(&fn_blinker);
+    functions.push_back(&bl_right);
+    functions.push_back(&bl_left);
 
     servo_timer.init();
     pwm.init();
@@ -262,6 +264,8 @@ void timer_tick(void * p_context) {
         state = State::Running;
         servo_timer.wake();
         pwm.wake();
+        bl_left.set(false);
+        bl_right.set(false);
         for(auto &fn: functions) fn->wake();
     }
 
