@@ -83,7 +83,9 @@ nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
 // nrf::UartOutputs<5> uart_pins;
 
-fn::BinarySelector fn_blinker{&bl_left, &bl_right};
+fn::FlipFlopFn fn_bl_l_ff{&bl_left};
+fn::FlipFlopFn fn_bl_r_ff{&bl_right};
+//fn::BinarySelector fn_blinker{&bl_left, &bl_right};
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
@@ -128,8 +130,8 @@ void setup() {
     functions.push_back(&main_light);
     //functions.push_back(&marker_light);
     //functions.push_back(&fn_blinker);
-    functions.push_back(&bl_right);
-    functions.push_back(&bl_left);
+    functions.push_back(&fn_bl_r_ff);
+    functions.push_back(&fn_bl_l_ff);
 
     servo_timer.init();
     pwm.init();
@@ -204,7 +206,7 @@ void process_str(etl::string_view in) {
         return;
     }
 
-    const auto val_opt = parse(token.value());
+    const auto val_opt = parse<fn::val_t>(token.value());
     if(!val_opt.has_value()) {
         logf("val parsing failed: '%.*s'\n", FMT_SV(in));
         return;
@@ -309,8 +311,8 @@ void timer_tick(void * p_context) {
 
 APP_TIMER_DEF(m_tick_timer);
 APP_TIMER_DEF(m_battery_timer);
-// APP_TIMER_DEF(m_pdm_timer);
 
+// APP_TIMER_DEF(m_pdm_timer);
 // void update_pdm(void * ctx) {
 //     pin_light_main.tick();
 // }

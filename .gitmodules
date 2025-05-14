@@ -1,0 +1,3 @@
+[submodule "lib/lib-outputs"]
+	path = lib/lib-outputs
+	url = https://gitlab.com/positron96-model-railway/lib-outputs.git
