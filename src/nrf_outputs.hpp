@@ -288,6 +288,7 @@ namespace nrf {
 };
 
 void nrf::Servo::set_us(uint16_t us) {
+    //logf("%d\n", us);
     if(owner!=nullptr)
         owner->set_us(index, us);
 };
