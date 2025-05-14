@@ -17,8 +17,8 @@
 			"path": "../../.platformio/penv/Lib/site-packages/platformio"
 		},
 		{
-			"name": "ble-rc-transmitter",
-			"path": "../../OneDrive - imec/Documents/PlatformIO/Projects/ble-rc-transmitter"
+			"name": "rc-ble-transmitter",
+			"path": "../rc-ble-transmitter"
 		}
 	],
 	"settings": {
@@ -102,7 +102,6 @@
 			"bsp_config.h": "c",
 			"nrf_ble_qwr.h": "c",
 			"iostream": "cpp"
-		},
-		"scm.showHistoryGraph": false
+		}
 	}
 }
