@@ -12,7 +12,10 @@
 
 
 #include <outputs.hpp>
+#include <functions/base_functions.hpp>
 #include <functions/car_functions.hpp>
+#include <functions/blinkers.hpp>
+
 #include "nrf_outputs.hpp"
 #include "nrf_outputs_pdm.hpp"
 #include "nrf_outputs_uart.hpp"
@@ -67,8 +70,11 @@ outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32)};
 outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
-fn::Blinker bl_left{&pin_light_left};
-fn::Blinker bl_right{&pin_light_right};
+fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
+auto bl_left = blinkers.fn_left();
+auto bl_right = blinkers.fn_right();
+//fn::Blinker bl_left{&pin_light_left};
+//fn::Blinker bl_right{&pin_light_right};
 
 // nrf::UartAnalogPin pin_brake_uart{2};
 // outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
@@ -254,10 +260,8 @@ void timer_tick(void * p_context) {
     if(clients == 0 && last_clients != 0) {
         for(auto &fn: functions) fn->sleep();
         disconnect_time = millis();
-        bl_left.set_period(500);
-        bl_right.set_period(500);
-        bl_left.restart();
-        bl_right.restart();
+        blinkers.set_period(500);
+        blinkers.restart_all();
         servo_timer.sleep();
         pwm.sleep();
         state = State::RecentlyDisconnected;
@@ -300,8 +304,9 @@ void timer_tick(void * p_context) {
     }
 
     ticks++;
-    bl_right.tick();
-    bl_left.tick();
+    //bl_right.tick();
+    //bl_left.tick();
+    blinkers.tick();
     // uart_pins.tick();
 }
 
