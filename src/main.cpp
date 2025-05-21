@@ -73,6 +73,7 @@ outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
 auto bl_left = blinkers.fn_left();
 auto bl_right = blinkers.fn_right();
+auto fn_hazard = blinkers.fn_hazard();
 //fn::Blinker bl_left{&pin_light_left};
 //fn::Blinker bl_right{&pin_light_right};
 
@@ -80,9 +81,9 @@ auto bl_right = blinkers.fn_right();
 // outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
 outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
 
-fn::SimpleDriving driver{&hbridge, &pin_light_rev, &pin_brake};
-fn::Steering steering{&steer_servo, &bl_left, &bl_right};
-fn::Simple main_light{&pin_light_main};
+fn::SimpleDriving fn_driver{&hbridge, &pin_light_rev, &pin_brake};
+fn::Steering fn_steering{&steer_servo, &bl_left, &bl_right};
+fn::Simple fn_main_light{&pin_light_main};
 //fn::Simple marker_light{&pin_light_marker};
 
 nrf::ServoTimer servo_timer;
@@ -123,7 +124,7 @@ void setup() {
     // uart_pins.add_pin(pin_brake_uart);
     // uart_pins.add_pin(pin_light_rev_uart);
 
-    functions.push_back(&driver);
+    functions.push_back(&fn_driver);
 
     steer_servo.inverted = true;
 
@@ -132,12 +133,13 @@ void setup() {
         while(1){}
     }
 
-    functions.push_back(&steering);
-    functions.push_back(&main_light);
+    functions.push_back(&fn_steering);
+    functions.push_back(&fn_main_light);
     //functions.push_back(&marker_light);
     //functions.push_back(&fn_blinker);
     functions.push_back(&fn_bl_r_ff);
     functions.push_back(&fn_bl_l_ff);
+    functions.push_back(&fn_hazard);
 
     servo_timer.init();
     pwm.init();
@@ -298,8 +300,8 @@ void timer_tick(void * p_context) {
         }
         break;
     case State::Running:
-        driver.tick();
-        steering.tick();
+        fn_driver.tick();
+        fn_steering.tick();
         break;
     }
 
@@ -343,4 +345,11 @@ int main() {
         nrf_pwr_mgmt_run();
     }
     return 0;
+}
+
+
+extern "C" void _exit(int status) {
+    __disable_irq();
+
+    while (1) { }
 }
