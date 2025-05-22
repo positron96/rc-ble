@@ -7,10 +7,10 @@
 namespace nrf {
 
     /**
-     * Uses hardware timer to generate servo events,
+     * Generate servo pulses with a timer,
      * but controls pins from timer interrupt.
      *
-     * Can handle much more servo outputs and does not occupy PPI channels.
+     * Can handle much more servo outputs and does not occupy PPI channels than ServoTimer.
      * Timer ISR fires every servo interval (i.e. ~1.5ms)
      */
     struct SWServoTimer: fn::Wakeable {
@@ -75,6 +75,7 @@ namespace nrf {
         void wake() { init(); }
 
         void sleep() {
+            set_paused(true);
             nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_STOP);
             nrf_timer_task_trigger(servo_timer, NRF_TIMER_TASK_CLEAR);
             nrf_timer_int_disable(servo_timer, cc_int_mask);

@@ -20,6 +20,15 @@ namespace nrf {
     NRF_TIMER_Type *servo_timer = NRF_TIMER1;
     constexpr IRQn_Type servo_irq = TIMER1_IRQn;
 
+    /**
+     * Class to generate servo pulses with hardware timer that (mostly) does not use CPU.
+     *
+     * It uses 3 CC channels and PPI to set 3 pins high,
+     *   and 4th CC channel to set them all low (so 3 servos max).
+     * For every servo output it uses 1 CC channel and 2 PPI channels.
+     * Timer ISR runs every 20ms to do some house cleaning
+     * (it stops outputting pulses after some cycles with the goal to reduce servo jitter).
+     */
     struct ServoTimer: fn::Wakeable {
 
         struct Servo: outputs::BaseServo {
@@ -169,6 +178,14 @@ namespace nrf {
         }
     };
 
+    inline void ServoTimer::Servo::set_us(uint16_t us) {
+        //logf("%d\n", us);
+        if(owner!=nullptr)
+            owner->set_us(index, us);
+    };
+
+
+
     NRF_PWM_Type *pwm = NRF_PWM0;
 
     /**
@@ -202,8 +219,6 @@ namespace nrf {
             PWM *owner;
             friend class PWM;
         };
-        friend class HBridge;
-        friend class Pin;
 
         bool add_hbridge(HBridge &hbr) {
             if(available_pins()<2) return false;
@@ -283,22 +298,8 @@ namespace nrf {
 
         size_t available_pins() { return pins.available(); }
     };
+
     inline const uint16_t PWM::PWM_ZERO = PWM::add_edge(0);
-
-    class Pin: public outputs::BasePin {
-    public:
-        size_t pin;
-        Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
-        void set(bool v) override {
-            nrf_gpio_pin_write(pin, v ? 1 : 0);
-        }
-    };
-
-    inline void ServoTimer::Servo::set_us(uint16_t us) {
-        //logf("%d\n", us);
-        if(owner!=nullptr)
-            owner->set_us(index, us);
-    };
 
     inline void PWM::HBridge::set_raw(uint8_t val, bool fwd) {
         if(owner!=nullptr)
@@ -308,6 +309,16 @@ namespace nrf {
     inline void PWM::Pin::set_pwm(uint8_t val) {
         if(owner!=nullptr)
             owner->set_pwm(val, idx);
+    };
+
+    /** A simple GPIO output. */
+    class Pin: public outputs::BasePin {
+    public:
+        size_t pin;
+        Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
+        void set(bool v) override {
+            nrf_gpio_pin_write(pin, v ? 1 : 0);
+        }
     };
 
 };
