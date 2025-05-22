@@ -19,6 +19,7 @@
 #include "nrf_outputs.hpp"
 #include "nrf_outputs_pdm.hpp"
 #include "nrf_outputs_uart.hpp"
+#include "nrf_outputs_servo.hpp"
 #include "line_processor.h"
 #include "battery.h"
 #include "ble_sd.hpp"
@@ -44,8 +45,8 @@ constexpr size_t D7 = 20;
 constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
 
-nrf::HBridge hbridge{M1, M2};
-nrf::Servo steer_servo{D7};
+nrf::PWM::HBridge hbridge{M1, M2};
+nrf::ServoTimer::Servo steer_servo{D7};
 nrf::Pin pin_light_left_hw{D5};
 nrf::Pin pin_light_right_hw{D6};
 // nrf::UartAnalogPin pin_light_left_uart{0};
@@ -58,7 +59,7 @@ auto &pin_light_right = pin_light_right_hw;
 nrf::Pin pin_light_main_hw{D1};
 //nrf::PdmPin pin_light_main{D1};
 
-nrf::PwmPin pin_light_rear_red{D2};
+nrf::PWM::Pin pin_light_rear_red{D2};
 nrf::Pin pin_light_rev_hw{D3};
 // nrf::UartAnalogPin pin_light_rev_uart{4};
 // nrf::UartAnalogPin pin_light_main_uart{3};
