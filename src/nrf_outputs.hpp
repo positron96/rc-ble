@@ -10,32 +10,36 @@
 #include <etl/array.h>
 
 #include <outputs.hpp>
+#include <functions/base_functions.hpp>
 
 #include "log.h"
 
 
 namespace nrf {
 
-    struct ServoTimer;
-
-    struct Servo: outputs::BaseServo {
-
-        size_t pin;
-        ServoTimer *owner;
-        size_t index;
-
-        Servo(size_t pin): pin{pin} {
-        }
-
-        void set_us(uint16_t us) override;
-
-    };
-
     NRF_TIMER_Type *servo_timer = NRF_TIMER1;
     constexpr IRQn_Type servo_irq = TIMER1_IRQn;
 
+    /**
+     * Class to generate servo pulses with hardware timer that (mostly) does not use CPU.
+     *
+     * It uses 3 CC channels and PPI to set 3 pins high,
+     *   and 4th CC channel to set them all low (so 3 servos max).
+     * For every servo output it uses 1 CC channel and 2 PPI channels.
+     * Timer ISR runs every 20ms to do some house cleaning
+     * (it stops outputting pulses after some cycles with the goal to reduce servo jitter).
+     */
     struct ServoTimer: fn::Wakeable {
-        static constexpr size_t SERVO_PERIOD = 20000;
+
+        struct Servo: outputs::BaseServo {
+            size_t pin;
+            ServoTimer *owner;
+            size_t index;
+            Servo(size_t pin): pin{pin} {
+            }
+            void set_us(uint16_t us) override;
+        };
+
         static constexpr size_t MAX_SERVOS = 3;
 
         etl::vector<Servo*, MAX_SERVOS> servos;
@@ -72,7 +76,8 @@ namespace nrf {
 
             nrf_timer_shorts_enable(servo_timer, NRF_TIMER_SHORT_COMPARE3_CLEAR_MASK);
 
-            nrf_timer_cc_write(servo_timer, NRF_TIMER_CC_CHANNEL3, SERVO_PERIOD);
+            nrf_timer_cc_write(
+                servo_timer, NRF_TIMER_CC_CHANNEL3, outputs::BaseServo::SERVO_PERIOD_US);
 
             for(size_t i=0; i<servos.size(); i++) {
                 size_t pin = servos[i]->pin;
@@ -173,33 +178,47 @@ namespace nrf {
         }
     };
 
-    class PWM;
-    struct HBridge: outputs::BaseHbridge {
-        size_t pin1, pin2;
-        PWM *owner;
-        size_t index;
-        HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
-
-        void set_raw(uint8_t val, bool fwd) override;
+    inline void ServoTimer::Servo::set_us(uint16_t us) {
+        //logf("%d\n", us);
+        if(owner!=nullptr)
+            owner->set_us(index, us);
     };
 
-    struct PwmPin: outputs::BaseAnalogPin {
-        size_t pin;
-        size_t idx;
-        PWM *owner;
-        PwmPin(size_t p): pin{p} {}
-        void set_pwm(uint8_t val) override;
-    };
+
 
     NRF_PWM_Type *pwm = NRF_PWM0;
-    constexpr uint16_t add_edge(const uint16_t v) { return v | 0x8000; }
-    constexpr uint16_t PWM_ZERO = add_edge(0);
 
+    /**
+     * Class that works with one NRF PWM peripheral.
+     *
+     * Provides 4 PWM pins either as AnalogPins or as HBridges (in any combination).
+     */
     class PWM: public fn::Wakeable {
     public:
         static constexpr size_t NUM_PINS = NRF_PWM_CHANNEL_COUNT;
         static constexpr size_t MAX_PWM = 255;
-        etl::array<uint16_t, NUM_PINS> data;
+
+        struct HBridge: outputs::BaseHbridge {
+            size_t pin1, pin2;
+
+            HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
+
+            void set_raw(uint8_t val, bool fwd) override;
+        private:
+            PWM *owner;
+            size_t index;
+            friend class PWM;
+        };
+
+        struct Pin: outputs::BaseAnalogPin {
+            size_t pin;
+            Pin(size_t p): pin{p} {}
+            void set_pwm(uint8_t val) override;
+        private:
+            size_t idx;
+            PWM *owner;
+            friend class PWM;
+        };
 
         bool add_hbridge(HBridge &hbr) {
             if(available_pins()<2) return false;
@@ -212,7 +231,7 @@ namespace nrf {
             return true;
         }
 
-        bool add_pin(PwmPin &pin) {
+        bool add_pin(Pin &pin) {
             if(available_pins()<1) return false;
             pin.idx = pins.size();
             pin.owner = this;
@@ -270,12 +289,29 @@ namespace nrf {
         }
 
     private:
+        constexpr static uint16_t add_edge(const uint16_t v) { return v | 0x8000; }
+        const static uint16_t PWM_ZERO;
 
-        etl::vector<size_t, 4> pins;
+        etl::vector<size_t, NUM_PINS> pins;
 
-        size_t available_pins() { return NUM_PINS - pins.size(); }
+        etl::array<uint16_t, NUM_PINS> data;
+
+        size_t available_pins() { return pins.available(); }
     };
 
+    inline const uint16_t PWM::PWM_ZERO = PWM::add_edge(0);
+
+    inline void PWM::HBridge::set_raw(uint8_t val, bool fwd) {
+        if(owner!=nullptr)
+            owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
+    };
+
+    inline void PWM::Pin::set_pwm(uint8_t val) {
+        if(owner!=nullptr)
+            owner->set_pwm(val, idx);
+    };
+
+    /** A simple GPIO output. */
     class Pin: public outputs::BasePin {
     public:
         size_t pin;
@@ -285,20 +321,4 @@ namespace nrf {
         }
     };
 
-};
-
-void nrf::Servo::set_us(uint16_t us) {
-    //logf("%d\n", us);
-    if(owner!=nullptr)
-        owner->set_us(index, us);
-};
-
-void nrf::HBridge::set_raw(uint8_t val, bool fwd) {
-    if(owner!=nullptr)
-        owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
-};
-
-void nrf::PwmPin::set_pwm(uint8_t val) {
-    if(owner!=nullptr)
-        owner->set_pwm(val, idx);
 };
