@@ -72,9 +72,9 @@ outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_
 outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
 fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
-auto bl_left = blinkers.fn_left();
-auto bl_right = blinkers.fn_right();
-auto fn_hazard = blinkers.fn_hazard();
+auto &bl_left = blinkers.fn_left();
+auto &bl_right = blinkers.fn_right();
+auto &fn_hazard = blinkers.fn_hazard();
 //fn::Blinker bl_left{&pin_light_left};
 //fn::Blinker bl_right{&pin_light_right};
 
@@ -158,70 +158,88 @@ etl::expected<T, etl::to_arithmetic_status> parse(const etl::string_view &str) {
 
 #define FMT_SV(sv)  (int)((sv).length()), (sv).data()
 
+/// @brief Process non-channel command
+/// @param in - command string
+void process_extra_cmd(const etl::string_view in) {
+    if (in.compare("!dfu") == 0) {
+        reboot_to_bootloader();
+        return;
+    } else
+    if(in.starts_with("!trim_steer=")) {
+        auto val = parse<uint16_t>(in.substr(12));
+        if(val.has_value()) {
+            logf("trim %d\n", val.value());
+            steer_servo.set_center_us(val.value());
+        } else {
+            logf("parse error '%s': %s\n", in, val.error().c_str());
+        }
+    } else
+    if(in.starts_with("!invert_drive=")) {
+        hbridge.inverted = in.at(14) == '1';
+    } else
+    if(in.starts_with("!name=")) {
+        const auto new_name = in.substr(6);
+        logf("name:='%.*s'[%d]\n", FMT_SV(new_name), new_name.length());
+        bool v = storage::set_dev_name(new_name);
+        if(v) {
+            ble::update_dev_name();
+        } else {
+            logf("set name failed\n");
+        }
+
+    } else {
+        logf("Unknown cmd: '%.*s'\n", FMT_SV(in));
+    }
+}
+
 void process_str(etl::string_view in) {
     //logf("processing '%.*s'\n", FMT_SV(in));
     if(in.starts_with("!")) {
-        if (in.compare("!dfu") == 0) {
-            reboot_to_bootloader();
-            return;
-        } else
-        if(in.starts_with("!trim_steer=")) {
-            auto val = parse<uint16_t>(in.substr(12));
-            if(val.has_value()) {
-                logf("trim %d\n", val.value());
-                steer_servo.set_center_us(val.value());
-            } else {
-                logf("parse error '%s': %s\n", in, val.error().c_str());
-            }
-        } else
-        if(in.starts_with("!invert_drive=")) {
-            hbridge.inverted = in.at(14) == '1';
-        } else
-        if(in.starts_with("!name=")) {
-            const auto new_name = in.substr(6);
-            logf("name:='%.*s'[%d]\n", FMT_SV(new_name), new_name.length());
-            bool v = storage::set_dev_name(new_name);
-            if(v) {
-                ble::update_dev_name();
-            } else {
-                logf("set name failed\n");
-            }
-
-        } else {
-            logf("Unknown cmd: '%.*s'\n", FMT_SV(in));
-        }
+        process_extra_cmd(in);
         return;
     }
+
     etl::optional<etl::string_view> token;
     token = etl::get_token(in, "=", token, true);
-    if(!token) {
-        logf("no '=': '%.*s'\n", FMT_SV(in));
+    if(!token || token.value().length()<1) {
+        logf("no channel: '%.*s'\n", FMT_SV(in));
         return;
     }
-    const auto ch_opt = parse(token.value());
-    if(!ch_opt.has_value()) {
-        logf("bad ch: '%.*s'\n", FMT_SV(in));
-        return;
+    fn::Fn *fn = nullptr;
+    switch(token.value().at(0)) {
+        case 'D': fn = &fn_driver; break;
+        case 'S': fn = &fn_steering; break;
+        case 'H': fn = &fn_main_light; break;
+        case 'E': fn = &fn_hazard; break;
+        case 'L': fn = &fn_bl_l_ff; break;
+        case 'R': fn = &fn_bl_r_ff; break;
+        //case 'M': fn = &fn_marker; break;
+        default: {
+            const auto ch_opt = parse(token.value());
+            if(ch_opt.has_value()) {
+                const auto ch_num = ch_opt.value();
+                if(ch_num < functions.size()) fn = functions[ch_num];
+            }
+        }
     }
-    const auto ch_num = ch_opt.value();
-    if(ch_num >= functions.size()) {
-        logf("bad ch: %d\n", ch_num);
+    if(fn == nullptr) {
+        logf("bad channel: '%.*s'\n", FMT_SV(in));
         return;
     }
 
     token = etl::get_token(in, ", ", token, true);
-    if(!token) {
-        logf("no val: '%.*s'\n", FMT_SV(in));
-        return;
-    }
-
+    if(!token) { logf("no value: '%.*s'\n", FMT_SV(in));  return; }
     const auto val_opt = parse<fn::val_t>(token.value());
-    if(!val_opt.has_value()) {
-        logf("val parsing failed: '%.*s'\n", FMT_SV(in));
-        return;
-    }
-    if(ch_num>1) logf("ch %d = %d\n", ch_num, val_opt.value());
-    functions[ch_num]->set(val_opt.value());
+    if(!val_opt) { logf("val parsing failed: '%.*s'\n", FMT_SV(in)); return; }
+
+    auto val = val_opt.value();
+    if(fn!=&fn_driver && fn!=&fn_steering)
+        logf("ch %d = %d\n",
+            std::distance(
+                functions.begin(),
+                std::find(functions.begin(), functions.end(), fn)),
+            val);
+    fn->set(fn::val_constrain(val));
 
 }
 
@@ -264,7 +282,7 @@ void timer_tick(void * p_context) {
         for(auto &fn: functions) fn->sleep();
         disconnect_time = millis();
         blinkers.set_period(500);
-        blinkers.restart_all();
+        blinkers.fn_hazard().set(true);
         servo_timer.sleep();
         pwm.sleep();
         state = State::RecentlyDisconnected;
@@ -273,8 +291,8 @@ void timer_tick(void * p_context) {
         state = State::Running;
         servo_timer.wake();
         pwm.wake();
-        bl_left.set(false);
-        bl_right.set(false);
+        blinkers.set_period(1000);
+        blinkers.fn_hazard().set(false);
         for(auto &fn: functions) fn->wake();
     }
 
@@ -284,19 +302,16 @@ void timer_tick(void * p_context) {
     case State::Hibernation: {
         static size_t last_flash = 0;
         if(millis() - last_flash > 10000) {
-            bl_left.pin->set(true);
-            bl_right.pin->set(true);
+            blinkers.set_all(true);
             delay(10);
-            bl_left.pin->set(false);
-            bl_right.pin->set(false);
+            blinkers.set_all(false);
             last_flash = millis();
         }
         break;
     }
     case State::RecentlyDisconnected:
         if(millis() - disconnect_time > 5000) {
-            bl_left.set(false);
-            bl_right.set(false);
+            blinkers.set_all(false);
             state = State::Hibernation;
         }
         break;
