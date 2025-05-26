@@ -346,7 +346,7 @@ int main() {
     uint32_t err_code;
     err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
     APP_ERROR_CHECK(err_code);
-    app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Ticking::PERIOD_MS), nullptr);
+    app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Ticking::TICK_PERIOD_MS), nullptr);
 
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
