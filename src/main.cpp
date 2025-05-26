@@ -1,21 +1,3 @@
-#include <algorithm>
-
-#include <nrf_delay.h>
-#include <app_timer.h>
-
-#include <etl/vector.h>
-#include <etl/string_view.h>
-#include <etl/optional.h>
-#include <etl/to_arithmetic.h>
-#include <etl/string_utilities.h>
-#include <etl/expected.h>
-
-
-#include <outputs.hpp>
-#include <functions/base_functions.hpp>
-#include <functions/car_functions.hpp>
-#include <functions/blinkers.hpp>
-
 #include "nrf_outputs.hpp"
 #include "nrf_outputs_pdm.hpp"
 #include "nrf_outputs_uart.hpp"
@@ -26,6 +8,23 @@
 #include "bootloader.h"
 #include "storage.hpp"
 #include "uart.hpp"
+
+#include <outputs.hpp>
+#include <functions/base_functions.hpp>
+#include <functions/car_functions.hpp>
+#include <functions/blinkers.hpp>
+
+#include <etl/vector.h>
+#include <etl/string_view.h>
+#include <etl/optional.h>
+#include <etl/to_arithmetic.h>
+#include <etl/string_utilities.h>
+#include <etl/expected.h>
+
+#include <nrf_delay.h>
+#include <app_timer.h>
+
+#include <algorithm>
 
 #define delay nrf_delay_ms
 
