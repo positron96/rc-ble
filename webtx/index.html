@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BLE RC Web Controller</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    button { margin: 10px; padding: 20px; font-size: 18px; }
+    #battery { font-size: 20px; margin-top: 20px; }
+    #joystick {
+      margin: 20px auto;
+      border: 1px solid #ccc;
+      touch-action: none;
+      background-color: #f9f9f9;
+    }
+    .controls { margin-top: 20px; }
+    .controls label { display: block; margin: 10px; font-size: 18px; }
+    #log {
+      margin-top: 30px;
+      width: 90%;
+      max-width: 600px;
+      height: 150px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      overflow-y: scroll;
+      text-align: left;
+      background: #f0f0f0;
+      margin-left: auto;
+      margin-right: auto;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <h1>BLE RC Web Controller</h1>
+  <button onclick="connect()" id="connectBtn">Connect</button>
+  <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+  <div id="battery">Battery: --%</div>
+  <canvas id="joystick" width="300" height="300"></canvas>
+
+  <div class="controls">
+    <label><input type="checkbox" onchange="toggleLight(this, 'H')"> Headlights</label>
+    <label><input type="checkbox" onchange="toggleLight(this, 'M')"> Marker lights</label>
+    <label><input type="checkbox" onchange="toggleLight(this, 'E')"> Hazard lights</label>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    const nusServiceUUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    const txCharUUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+    const rxCharUUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+    const batteryServiceUUID = 'battery_service';
+    const batteryCharUUID = 'battery_level';
+
+    let txCharacteristic = null;
+    let rxCharacteristic = null;
+    let device = null;
+    let batteryChar = null;
+
+    function log(message) {
+      const logDiv = document.getElementById('log');
+      logDiv.textContent += message + '\n';
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [nusServiceUUID] }],
+          optionalServices: [batteryServiceUUID]
+        });
+
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        const server = await device.gatt.connect();
+        const nusService = await server.getPrimaryService(nusServiceUUID);
+        txCharacteristic = await nusService.getCharacteristic(txCharUUID);
+        rxCharacteristic = await nusService.getCharacteristic(rxCharUUID);
+
+        rxCharacteristic.startNotifications();
+        rxCharacteristic.addEventListener('characteristicvaluechanged', event => {
+          const decoder = new TextDecoder();
+          const value = decoder.decode(event.target.value);
+          log('Received: ' + value);
+        });
+
+        const batteryService = await server.getPrimaryService(batteryServiceUUID);
+        batteryChar = await batteryService.getCharacteristic(batteryCharUUID);
+        updateBatteryLevel();
+
+        await batteryChar.startNotifications();
+        batteryChar.addEventListener('characteristicvaluechanged', updateBatteryLevel);
+
+        document.getElementById('connectBtn').disabled = true;
+        document.getElementById('disconnectBtn').disabled = false;
+
+        log('Connected to device');
+      } catch (error) {
+        console.error('Bluetooth connection failed:', error);
+        log('Connection failed. Make sure the device is in range and supports the required services.');
+      }
+    }
+
+    function disconnect() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+      }
+    }
+
+    function updateBatteryLevel(event) {
+      let value;
+      if (event && event.target?.value) {
+        value = event.target.value.getUint8(0);
+      } else if (batteryChar) {
+        batteryChar.readValue().then(val => {
+          document.getElementById('battery').textContent = `Battery: ${val.getUint8(0)}%`;
+        });
+        return;
+      }
+      if (typeof value === 'number') {
+        document.getElementById('battery').textContent = `Battery: ${value}%`;
+      }
+    }
+
+    function onDisconnected(event) {
+      log('Device disconnected');
+      txCharacteristic = null;
+      document.getElementById('battery').textContent = 'Battery: --%';
+      document.getElementById('connectBtn').disabled = false;
+      document.getElementById('disconnectBtn').disabled = true;
+    }
+
+    function sendCommand(command) {
+      if (!txCharacteristic) {
+        log('Device not connected.');
+        return;
+      }
+      try {
+        const encoder = new TextEncoder();
+        txCharacteristic.writeValue(encoder.encode(command));
+        log('Sent: ' + command.trim());
+      } catch (error) {
+        console.error('Failed to send command:', error);
+        log('Error sending command: ' + error);
+      }
+    }
+
+    function toggleLight(checkbox, type) {
+      const value = checkbox.checked ? 127 : 0;
+      sendCommand(`${type}=${value}\n`);
+    }
+
+    const canvas = document.getElementById('joystick');
+    const ctx = canvas.getContext('2d');
+    const center = { x: canvas.width / 2, y: canvas.height / 2 };
+
+    function drawJoystick(x, y) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, 140, 0, Math.PI * 2);
+      ctx.strokeStyle = '#aaa';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = '#007bff';
+      ctx.fill();
+    }
+
+    drawJoystick(center.x, center.y);
+
+    function handleJoystick(x, y) {
+      drawJoystick(x, y);
+
+      const dx = x - center.x;
+      const dy = y - center.y;
+      const d = Math.max(-127, Math.min(127, -Math.round(dy / (canvas.height / 2) * 127)));
+      const s = Math.max(-127, Math.min(127, Math.round(dx / (canvas.width / 2) * 127)));
+      sendCommand(`D=${d}\nS=${s}\n`);
+    }
+
+    function getTouchPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = evt.touches[0];
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('touchstart', evt => {
+      evt.preventDefault();
+      const pos = getTouchPos(evt);
+      handleJoystick(pos.x, pos.y);
+    });
+
+    canvas.addEventListener('touchmove', evt => {
+      evt.preventDefault();
+      const pos = getTouchPos(evt);
+      handleJoystick(pos.x, pos.y);
+    });
+
+    canvas.addEventListener('touchend', () => {
+      handleJoystick(center.x, center.y);
+    });
+
+    canvas.addEventListener('mousedown', evt => {
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      handleJoystick(x, y);
+      const moveHandler = evt => {
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
+        handleJoystick(x, y);
+      };
+      const upHandler = () => {
+        handleJoystick(center.x, center.y);
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', upHandler);
+      };
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', upHandler);
+    });
+  </script>
+</body>
+</html>
