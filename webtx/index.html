@@ -42,6 +42,11 @@
     <label><input type="checkbox" onchange="toggleLight(this, 'H')"> Headlights</label>
     <label><input type="checkbox" onchange="toggleLight(this, 'M')"> Marker lights</label>
     <label><input type="checkbox" onchange="toggleLight(this, 'E')"> Hazard lights</label>
+    <button id="moreBtn" onclick="toggleExtras()" style="margin-top:15px;">More...</button>
+    <div id="extras" style="display:none; margin-top:10px;">
+      <button onclick="resetToDFU()">Reset to DFU</button>
+      <button onclick="setName()">Set name</button>
+    </div>
   </div>
 
   <div id="log"></div>
@@ -149,6 +154,25 @@
     function toggleLight(checkbox, type) {
       const value = checkbox.checked ? 127 : 0;
       sendCommand(`${type}=${value}\n`);
+    }
+
+    function toggleExtras() {
+      const extras = document.getElementById('extras');
+      extras.style.display = extras.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function resetToDFU() {
+      sendCommand('!dfu\n');
+    }
+
+    function setName() {
+      // Use device.name from Web Bluetooth API if available
+      const current = (device && device.name) ? device.name : '';
+      const promptName = 'Enter new device name:';
+      const name = prompt(promptName, current);
+      if (name && name.trim()) {
+        sendCommand(`!name=${name.trim()}\n`);
+      }
     }
 
     const canvas = document.getElementById('joystick');

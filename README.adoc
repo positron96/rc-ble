@@ -25,16 +25,15 @@ Instructions for flashing will come later.
 ## Controllers for this firmware
 
 This project is not compatible with typical RC remotes (due to using BLE),
- so it requires its own remote.
+ so it requires its own dedicated BLE-based remote.
 
-At the moment there are possible options:\
+At the moment there are these possible options:
 
  * Android application created with MIT App Inventor.
    Currently no way to provide link to AppInventor project.
- * Hardware remote that uses ESP3.
-   Firmware is hosted here: https://github.com/positron96/rc-ble-transmitter.
-   Hardware is DIY, but will eventually be a dedicated 3D-printed remote.
- * (Experimental) Web Bluetooth controller.
+ * Hardware remote that uses ESP32.
+   Description here: https://github.com/positron96/rc-ble-transmitter.
+ * (Experimental) Web-based controller utilising Web Bluetooth standard.
    Should work on a lot of smartphones without the need to install anything.   
    Launch it from here: https://positron96.github.io/rc-ble/.
    Source is in link:webtx[this folder].
