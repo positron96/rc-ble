@@ -4,20 +4,89 @@
   <meta charset="UTF-8">
   <title>BLE RC Web Controller</title>
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-    button { margin: 10px; padding: 20px; font-size: 18px; }
-    #battery { font-size: 20px; margin-top: 20px; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+    }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 10px 10px 10px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #ddd;
+    }
+    .top-bar button {
+      padding: 12px 20px;
+      font-size: 18px;
+      margin: 0;
+    }
+    #battery {
+      font-size: 20px;
+      margin-left: 15px;
+    }
+    .main-content {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+      margin: 30px auto 0 auto;
+      max-width: 1100px;
+      width: 100%;
+      gap: 40px;
+      padding: 0 10px;
+    }
     #joystick {
-      margin: 20px auto;
       border: 1px solid #ccc;
       touch-action: none;
       background-color: #f9f9f9;
+      display: block;
+      margin: 0 auto;
+      width: 300px;
+      height: 300px;
+      max-width: 90vw;
+      max-height: 90vw;
     }
-    .controls { margin-top: 20px; }
-    .controls label { display: block; margin: 10px; font-size: 18px; }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 0;
+      width: 320px;
+      max-width: 100%;
+      gap: 10px;
+    }
+    .controls label {
+      font-size: 20px;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .controls input[type="checkbox"] {
+      width: 28px;
+      height: 28px;
+      accent-color: #007bff;
+    }
+    #moreBtn {
+      font-size: 18px;
+      padding: 10px 18px;
+      margin-top: 10px;
+    }
+    #extras button {
+      font-size: 16px;
+      margin-right: 10px;
+      margin-bottom: 5px;
+      padding: 8px 14px;
+    }
     #log {
       margin-top: 30px;
-      width: 90%;
+      width: 95%;
       max-width: 600px;
       height: 150px;
       border: 1px solid #ccc;
@@ -28,29 +97,89 @@
       margin-left: auto;
       margin-right: auto;
       white-space: pre-line;
+      font-size: 15px;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 900px) {
+      .main-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+      #joystick {
+        width: 90vw;
+        height: 90vw;
+        max-width: 400px;
+        max-height: 400px;
+      }
+      .controls {
+        width: 100%;
+        max-width: 500px;
+        align-items: stretch;
+      }
+      .controls label {
+        font-size: 22px;
+      }
+      .controls input[type="checkbox"] {
+        width: 36px;
+        height: 36px;
+      }
+    }
+    @media (max-width: 600px), (orientation: portrait) {
+      .main-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      #joystick {
+        width: 98vw;
+        height: 98vw;
+        max-width: 98vw;
+        max-height: 98vw;
+      }
+      .controls {
+        width: 100%;
+        max-width: 100vw;
+        align-items: stretch;
+        gap: 14px;
+      }
+      .controls label {
+        font-size: 26px;
+        padding: 10px 0;
+      }
+      .controls input[type="checkbox"] {
+        width: 44px;
+        height: 44px;
+      }
+      #log {
+        font-size: 16px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>BLE RC Web Controller</h1>
-  <button onclick="connect()" id="connectBtn">Connect</button>
-  <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
-  <div id="battery">Battery: --%</div>
-  <canvas id="joystick" width="300" height="300"></canvas>
-
-  <div class="controls">
-    <label><input type="checkbox" onchange="toggleLight(this, 'H')"> Headlights</label>
-    <label><input type="checkbox" onchange="toggleLight(this, 'M')"> Marker lights</label>
-    <label><input type="checkbox" onchange="toggleLight(this, 'E')"> Hazard lights</label>
-    <button id="moreBtn" onclick="toggleExtras()" style="margin-top:15px;">More...</button>
-    <div id="extras" style="display:none; margin-top:10px;">
+  <div class="top-bar">
+    <button onclick="connect()" id="connectBtn">Connect</button>
+    <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+    <span id="battery">Battery: --%</span>
+    <button id="moreBtn" onclick="toggleExtras()">More...</button>
+    <div id="extras" style="display:none;">
       <button onclick="resetToDFU()">Reset to DFU</button>
       <button onclick="setName()">Set name</button>
     </div>
   </div>
-
+  <h1 style="text-align:center; margin-top:20px;">BLE RC Web Controller</h1>
+  <div class="main-content">
+    <canvas id="joystick" width="300" height="300"></canvas>
+    <div class="controls">
+      <label><input type="checkbox" onchange="toggleLight(this, 'H')"> Headlights</label>
+      <label><input type="checkbox" onchange="toggleLight(this, 'M')"> Marker lights</label>
+      <label><input type="checkbox" onchange="toggleLight(this, 'E')"> Hazard lights</label>
+    </div>
+  </div>
   <div id="log"></div>
-
   <script>
     const nusServiceUUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
     const txCharUUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
@@ -70,6 +199,7 @@
     }
 
     async function connect() {
+      document.getElementById('connectBtn').disabled = true; // Disable immediately
       try {
         device = await navigator.bluetooth.requestDevice({
           filters: [{ services: [nusServiceUUID] }],
@@ -97,13 +227,13 @@
         await batteryChar.startNotifications();
         batteryChar.addEventListener('characteristicvaluechanged', updateBatteryLevel);
 
-        document.getElementById('connectBtn').disabled = true;
         document.getElementById('disconnectBtn').disabled = false;
 
         log('Connected to device');
       } catch (error) {
         console.error('Bluetooth connection failed:', error);
         log('Connection failed. Make sure the device is in range and supports the required services.');
+        document.getElementById('connectBtn').disabled = false; // Re-enable on failure
       }
     }
 
@@ -177,57 +307,56 @@
 
     const canvas = document.getElementById('joystick');
     const ctx = canvas.getContext('2d');
-    const center = { x: canvas.width / 2, y: canvas.height / 2 };
+    let center = { x: canvas.width / 2, y: canvas.height / 2 };
 
+    // Resize canvas to fit its container
+    function resizeJoystick() {
+      // Get the display size from CSS
+      const rect = canvas.getBoundingClientRect();
+      // Set canvas pixel size to match display size (for crispness on all devices)
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      center = { x: canvas.width / 2, y: canvas.height / 2 };
+      drawJoystick(center.x, center.y);
+    }
+
+    // Update drawJoystick to use dynamic radius
     function drawJoystick(x, y) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Outer circle radius: 90% of half the smallest dimension
+      const radius = Math.min(canvas.width, canvas.height) * 0.45;
       ctx.beginPath();
-      ctx.arc(center.x, center.y, 140, 0, Math.PI * 2);
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
       ctx.strokeStyle = '#aaa';
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.arc(x, y, radius * 0.14, 0, Math.PI * 2); // Thumb size scales
       ctx.fillStyle = '#007bff';
       ctx.fill();
     }
 
-    drawJoystick(center.x, center.y);
-
+    // Update handleJoystick to use dynamic scaling
     function handleJoystick(x, y) {
       drawJoystick(x, y);
-
       const dx = x - center.x;
       const dy = y - center.y;
-      const d = Math.max(-127, Math.min(127, -Math.round(dy / (canvas.height / 2) * 127)));
-      const s = Math.max(-127, Math.min(127, Math.round(dx / (canvas.width / 2) * 127)));
+      const max = Math.min(canvas.width, canvas.height) * 0.45;
+      const d = Math.max(-127, Math.min(127, -Math.round(dy / max * 127)));
+      const s = Math.max(-127, Math.min(127, Math.round(dx / max * 127)));
       sendCommand(`D=${d}\nS=${s}\n`);
     }
 
+    // Update getTouchPos to use current canvas size
     function getTouchPos(evt) {
       const rect = canvas.getBoundingClientRect();
       const touch = evt.touches[0];
       return {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top
+        x: (touch.clientX - rect.left),
+        y: (touch.clientY - rect.top)
       };
     }
 
-    canvas.addEventListener('touchstart', evt => {
-      evt.preventDefault();
-      const pos = getTouchPos(evt);
-      handleJoystick(pos.x, pos.y);
-    });
-
-    canvas.addEventListener('touchmove', evt => {
-      evt.preventDefault();
-      const pos = getTouchPos(evt);
-      handleJoystick(pos.x, pos.y);
-    });
-
-    canvas.addEventListener('touchend', () => {
-      handleJoystick(center.x, center.y);
-    });
-
+    // Mouse events also use current canvas size
     canvas.addEventListener('mousedown', evt => {
       const rect = canvas.getBoundingClientRect();
       const x = evt.clientX - rect.left;
@@ -246,6 +375,28 @@
       window.addEventListener('mousemove', moveHandler);
       window.addEventListener('mouseup', upHandler);
     });
+
+    // Touch events (no change needed, already uses getTouchPos)
+    canvas.addEventListener('touchstart', evt => {
+      evt.preventDefault();
+      const pos = getTouchPos(evt);
+      handleJoystick(pos.x, pos.y);
+    });
+    canvas.addEventListener('touchmove', evt => {
+      evt.preventDefault();
+      const pos = getTouchPos(evt);
+      handleJoystick(pos.x, pos.y);
+    });
+    canvas.addEventListener('touchend', () => {
+      handleJoystick(center.x, center.y);
+    });
+
+    // Listen for resize and orientation changes
+    window.addEventListener('resize', resizeJoystick);
+    window.addEventListener('orientationchange', resizeJoystick);
+
+    // Initial sizing
+    resizeJoystick();
   </script>
 </body>
 </html>
