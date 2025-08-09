@@ -27,6 +27,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Get git commit info
+        id: commit
+        run: |
+          echo "GIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "GIT_DATE=$(git log -1 --format=%cd --date=short)" >> $GITHUB_ENV
+
+      - name: Inject git info into index.html
+        run: |
+          FILE="webtx/index.html"
+          INFO="Ver: ${{ env.GIT_HASH }}, Date: ${{ env.GIT_DATE }}"
+          sed -i "s/%VER%/$INFO/g" "$FILE"
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
