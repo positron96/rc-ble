@@ -3,161 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>BLE RC Web Controller</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-    }
-    .top-bar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      padding: 20px 10px 10px 10px;
-      background: #f7f7f7;
-      border-bottom: 1px solid #ddd;
-    }
-    .top-bar button {
-      padding: 12px 20px;
-      font-size: 18px;
-      margin: 0;
-    }
-    #battery {
-      font-size: 20px;
-      margin-left: 15px;
-    }
-    .main-content {
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      align-items: flex-start;
-      margin: 30px auto 0 auto;
-      max-width: 1100px;
-      width: 100%;
-      gap: 40px;
-      padding: 0 10px;
-    }
-    #joystick {
-      border: 1px solid #ccc;
-      touch-action: none;
-      background-color: #f9f9f9;
-      display: block;
-      margin: 0 auto;
-      width: 300px;
-      height: 300px;
-      max-width: 90vw;
-      max-height: 90vw;
-    }
-    .controls {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      margin-top: 0;
-      width: 320px;
-      max-width: 100%;
-      gap: 10px;
-    }
-    .controls label {
-      font-size: 20px;
-      margin: 0 0 10px 0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      cursor: pointer;
-    }
-    .controls input[type="checkbox"] {
-      width: 28px;
-      height: 28px;
-      accent-color: #007bff;
-    }
-    #moreBtn {
-      font-size: 18px;
-      padding: 10px 18px;
-      margin-top: 10px;
-    }
-    #extras button {
-      font-size: 16px;
-      margin-right: 10px;
-      margin-bottom: 5px;
-      padding: 8px 14px;
-    }
-    #log {
-      margin-top: 30px;
-      width: 95%;
-      max-width: 600px;
-      height: 150px;
-      border: 1px solid #ccc;
-      padding: 10px;
-      overflow-y: scroll;
-      text-align: left;
-      background: #f0f0f0;
-      margin-left: auto;
-      margin-right: auto;
-      white-space: pre-line;
-      font-size: 15px;
-    }
-
-    /* Responsive styles */
-    @media (max-width: 900px) {
-      .main-content {
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
-      }
-      #joystick {
-        width: 90vw;
-        height: 90vw;
-        max-width: 400px;
-        max-height: 400px;
-      }
-      .controls {
-        width: 100%;
-        max-width: 500px;
-        align-items: stretch;
-      }
-      .controls label {
-        font-size: 22px;
-      }
-      .controls input[type="checkbox"] {
-        width: 36px;
-        height: 36px;
-      }
-    }
-    @media (max-width: 600px), (orientation: portrait) {
-      .main-content {
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        margin-top: 10px;
-      }
-      #joystick {
-        width: 98vw;
-        height: 98vw;
-        max-width: 98vw;
-        max-height: 98vw;
-      }
-      .controls {
-        width: 100%;
-        max-width: 100vw;
-        align-items: stretch;
-        gap: 14px;
-      }
-      .controls label {
-        font-size: 26px;
-        padding: 10px 0;
-      }
-      .controls input[type="checkbox"] {
-        width: 44px;
-        height: 44px;
-      }
-      #log {
-        font-size: 16px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="top-bar">
@@ -174,9 +20,9 @@
   <div class="main-content">
     <canvas id="joystick" width="300" height="300"></canvas>
     <div class="controls">
-      <label><input type="checkbox" onchange="toggleLight(this, 'H')"> Headlights</label>
-      <label><input type="checkbox" onchange="toggleLight(this, 'M')"> Marker lights</label>
-      <label><input type="checkbox" onchange="toggleLight(this, 'E')"> Hazard lights</label>
+      <label><input type="checkbox" onchange="toggleLight(this, 'H')" id="headlightCheck"> Headlights</label>
+      <label><input type="checkbox" onchange="toggleLight(this, 'M')" id="markerlightCheck"> Marker lights</label>
+      <label><input type="checkbox" onchange="toggleLight(this, 'E')" id="hazardlightCheck"> Hazard lights</label>
     </div>
   </div>
   <div id="log"></div>
@@ -191,6 +37,12 @@
     let rxCharacteristic = null;
     let device = null;
     let batteryChar = null;
+
+    // Gamepad state variables
+    let gamepadIndex = null;
+    let gamepadInterval = null;
+    let prevButtonStates = [];
+
 
     function log(message) {
       const logDiv = document.getElementById('log');
@@ -220,12 +72,17 @@
           log('Received: ' + value);
         });
 
-        const batteryService = await server.getPrimaryService(batteryServiceUUID);
-        batteryChar = await batteryService.getCharacteristic(batteryCharUUID);
-        updateBatteryLevel();
+        try {
+            const batteryService = await server.getPrimaryService(batteryServiceUUID);
+            batteryChar = await batteryService.getCharacteristic(batteryCharUUID);
+            updateBatteryLevel();
 
-        await batteryChar.startNotifications();
-        batteryChar.addEventListener('characteristicvaluechanged', updateBatteryLevel);
+            await batteryChar.startNotifications();
+            batteryChar.addEventListener('characteristicvaluechanged', updateBatteryLevel);
+        } catch (error) {
+            log('Battery service not found. Skipping.');
+        }
+
 
         document.getElementById('disconnectBtn').disabled = false;
 
@@ -250,7 +107,7 @@
       } else if (batteryChar) {
         batteryChar.readValue().then(val => {
           document.getElementById('battery').textContent = `Battery: ${val.getUint8(0)}%`;
-        });
+        }).catch(err => log('Could not read battery level.'));
         return;
       }
       if (typeof value === 'number') {
@@ -268,13 +125,13 @@
 
     function sendCommand(command) {
       if (!txCharacteristic) {
-        log('Device not connected.');
+        // Silently fail if not connected, to avoid flooding the log
         return;
       }
       try {
         const encoder = new TextEncoder();
-        txCharacteristic.writeValue(encoder.encode(command));
-        log('Sent: ' + command.trim());
+        txCharacteristic.writeValueWithoutResponse(encoder.encode(command));
+        // log('Sent: ' + command.trim()); // Logging removed to prevent flooding from gamepad
       } catch (error) {
         console.error('Failed to send command:', error);
         log('Error sending command: ' + error);
@@ -284,6 +141,7 @@
     function toggleLight(checkbox, type) {
       const value = checkbox.checked ? 127 : 0;
       sendCommand(`${type}=${value}\n`);
+      log(`Toggled ${type} light ${checkbox.checked ? 'ON' : 'OFF'}`);
     }
 
     function toggleExtras() {
@@ -296,7 +154,6 @@
     }
 
     function setName() {
-      // Use device.name from Web Bluetooth API if available
       const current = (device && device.name) ? device.name : '';
       const promptName = 'Enter new device name:';
       const name = prompt(promptName, current);
@@ -309,33 +166,27 @@
     const ctx = canvas.getContext('2d');
     let center = { x: canvas.width / 2, y: canvas.height / 2 };
 
-    // Resize canvas to fit its container
     function resizeJoystick() {
-      // Get the display size from CSS
       const rect = canvas.getBoundingClientRect();
-      // Set canvas pixel size to match display size (for crispness on all devices)
       canvas.width = rect.width;
       canvas.height = rect.height;
       center = { x: canvas.width / 2, y: canvas.height / 2 };
       drawJoystick(center.x, center.y);
     }
 
-    // Update drawJoystick to use dynamic radius
     function drawJoystick(x, y) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Outer circle radius: 90% of half the smallest dimension
       const radius = Math.min(canvas.width, canvas.height) * 0.45;
       ctx.beginPath();
       ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
       ctx.strokeStyle = '#aaa';
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x, y, radius * 0.14, 0, Math.PI * 2); // Thumb size scales
+      ctx.arc(x, y, radius * 0.14, 0, Math.PI * 2);
       ctx.fillStyle = '#007bff';
       ctx.fill();
     }
 
-    // Update handleJoystick to use dynamic scaling
     function handleJoystick(x, y) {
       drawJoystick(x, y);
       const dx = x - center.x;
@@ -346,7 +197,6 @@
       sendCommand(`D=${d}\nS=${s}\n`);
     }
 
-    // Update getTouchPos to use current canvas size
     function getTouchPos(evt) {
       const rect = canvas.getBoundingClientRect();
       const touch = evt.touches[0];
@@ -356,16 +206,15 @@
       };
     }
 
-    // Mouse events also use current canvas size
     canvas.addEventListener('mousedown', evt => {
       const rect = canvas.getBoundingClientRect();
       const x = evt.clientX - rect.left;
       const y = evt.clientY - rect.top;
       handleJoystick(x, y);
-      const moveHandler = evt => {
-        const x = evt.clientX - rect.left;
-        const y = evt.clientY - rect.top;
-        handleJoystick(x, y);
+      const moveHandler = moveEvt => {
+        const mx = moveEvt.clientX - rect.left;
+        const my = moveEvt.clientY - rect.top;
+        handleJoystick(mx, my);
       };
       const upHandler = () => {
         handleJoystick(center.x, center.y);
@@ -376,27 +225,98 @@
       window.addEventListener('mouseup', upHandler);
     });
 
-    // Touch events (no change needed, already uses getTouchPos)
     canvas.addEventListener('touchstart', evt => {
       evt.preventDefault();
       const pos = getTouchPos(evt);
       handleJoystick(pos.x, pos.y);
-    });
+    }, { passive: false });
     canvas.addEventListener('touchmove', evt => {
       evt.preventDefault();
       const pos = getTouchPos(evt);
       handleJoystick(pos.x, pos.y);
-    });
+    }, { passive: false });
     canvas.addEventListener('touchend', () => {
       handleJoystick(center.x, center.y);
     });
 
-    // Listen for resize and orientation changes
+    // --- Gamepad API Integration ---
+
+    function pollGamepad() {
+        if (gamepadIndex === null) return;
+        const gamepad = navigator.getGamepads()[gamepadIndex];
+        if (!gamepad) return;
+
+        // Axes
+        let axisX = gamepad.axes[0];
+        let axisY = gamepad.axes[1];
+        const deadzone = 0.1;
+
+        // --- Use B6-B7 difference for Y axis override ---
+        // B6: gamepad.buttons[6], B7: gamepad.buttons[7]
+        if (gamepad.buttons.length >= 8) {
+            const b6 = gamepad.buttons[6].value || (gamepad.buttons[6].pressed ? 1 : 0);
+            const b7 = gamepad.buttons[7].value || (gamepad.buttons[7].pressed ? 1 : 0);
+            // If either is pressed, override axisY
+            if (b6 !== 0 || b7 !== 0) {
+                axisY = b6 - b7; // Range: -1 (B7) to +1 (B6)
+            }
+        }
+
+        if (Math.abs(axisX) < deadzone) axisX = 0;
+        if (Math.abs(axisY) < deadzone) axisY = 0;
+
+        const max = Math.min(canvas.width, canvas.height) * 0.45;
+        const jX = center.x + axisX * max;
+        const jY = center.y + axisY * max;
+        drawJoystick(jX, jY);
+
+        const d = Math.max(-127, Math.min(127, -Math.round(axisY * 127)));
+        const s = Math.max(-127, Math.min(127, Math.round(axisX * 127)));
+        sendCommand(`D=${d}\nS=${s}\n`);
+
+        // Buttons
+        const lightCheckboxes = [
+            document.getElementById('headlightCheck'),
+            document.getElementById('markerlightCheck'),
+            document.getElementById('hazardlightCheck')
+        ];
+
+        gamepad.buttons.slice(0, 3).forEach((button, index) => {
+            if (button.pressed && !prevButtonStates[index]) {
+                lightCheckboxes[index].click(); // Triggers onchange event and toggleLight function
+            }
+            prevButtonStates[index] = button.pressed;
+        });
+    }
+
+    window.addEventListener('gamepadconnected', (event) => {
+        log(`Gamepad connected: ${event.gamepad.id}`);
+        gamepadIndex = event.gamepad.index;
+        // Initialize button states
+        prevButtonStates = navigator.getGamepads()[gamepadIndex].buttons.map(b => b.pressed);
+
+        if (gamepadInterval) {
+            clearInterval(gamepadInterval);
+        }
+        gamepadInterval = setInterval(pollGamepad, 50); // Poll 20 times per second
+    });
+
+    window.addEventListener('gamepaddisconnected', (event) => {
+        if (gamepadIndex === event.gamepad.index) {
+            log('Gamepad disconnected.');
+            clearInterval(gamepadInterval);
+            gamepadInterval = null;
+            gamepadIndex = null;
+            handleJoystick(center.x, center.y); // Reset joystick to center
+        }
+    });
+
+
+    // Initial setup
     window.addEventListener('resize', resizeJoystick);
     window.addEventListener('orientationchange', resizeJoystick);
-
-    // Initial sizing
     resizeJoystick();
+
   </script>
 </body>
 </html>
