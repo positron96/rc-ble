@@ -44,6 +44,40 @@ constexpr size_t D7 = 20;
 constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
 
+// BLE-RC 1.2
+constexpr size_t BAT_PIN = 30;
+constexpr nrf_saadc_input_t BAT_ADC_CH = NRF_SAADC_INPUT_AIN6;
+constexpr size_t D0 = 0; // not on devboard
+constexpr size_t D1 = 1;
+constexpr size_t D2 = 4;
+constexpr size_t D3 = 5;
+constexpr size_t D4 = 6;
+constexpr size_t D5 = 14;
+constexpr size_t D6 = 16;
+constexpr size_t D7 = 18;
+constexpr size_t D8 = 20;
+constexpr size_t DA = 9;
+constexpr size_t DB = 10;  // not on devboard
+constexpr size_t M1 = 25;
+constexpr size_t M2 = 28;
+
+
+
+
+// 1 marker
+// 2 front
+// 3 reverse
+// 4 brake
+
+// 5 left
+// 6 right
+
+// 7 steering servo
+// 8 uart tx
+// 9 extra
+
+// 10, 11, motor
+
 nrf::PWM::HBridge hbridge{M1, M2};
 nrf::ServoTimer::Servo steer_servo{D7};
 nrf::Pin pin_light_left_hw{D5};
