@@ -1,0 +1,33 @@
+{
+    "build": {
+      "cpu": "cortex-m4",
+      "f_cpu": "64000000L",
+      "mcu": "nrf52810_xxaa",
+      "extra_flags": "-DBLE_RC_V12"
+    },
+    "connectivity": [
+      "bluetooth"
+    ],
+    "debug": {
+      "jlink_device": "nRF52810_xxAA",
+      "svd_path": "nrf52810.svd"
+    },
+    "frameworks": [
+      "nrf5sdk"
+    ],
+    "name": "BLE-RC v1.2",
+    "upload": {
+      "maximum_ram_size": 24576,
+      "maximum_size": 180224,
+      "protocol": "jlink",
+      "protocols": [
+        "jlink",
+        "nrfjprog",
+        "stlink",
+        "cmsis-dap",
+        "blackmagic"
+      ]
+    },
+    "url": "https://oshwlab.com/positron96/ble-rc",
+    "vendor": "Positron96"
+  }
