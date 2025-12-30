@@ -10,6 +10,7 @@
 #include "uart.hpp"
 
 #include <outputs.hpp>
+#include <timed_utils.hpp>
 #include <functions/base_functions.hpp>
 #include <functions/car_functions.hpp>
 #include <functions/blinkers.hpp>
@@ -132,12 +133,25 @@ fn::FlipFlopFn fn_bl_l_ff{&bl_left};
 fn::FlipFlopFn fn_bl_r_ff{&bl_right};
 //fn::BinarySelector fn_blinker{&bl_left, &bl_right};
 
+
+APP_TIMER_DEF(m_tick_timer);
+APP_TIMER_DEF(m_battery_timer);
+
+
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
 };
 
 uint32_t millis(void) {
     return app_timer_cnt_get() * 1000 / 32768;
+}
+
+void ticking_cb(bool running) {
+    if(running) {
+        app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Tickable::TICK_PERIOD_MS), nullptr);
+    } else {
+        app_timer_stop(m_tick_timer);
+    }
 }
 
 
@@ -179,10 +193,9 @@ void setup() {
     functions.push_back(&fn_bl_l_ff);
     functions.push_back(&fn_hazard);
 
-    logf("driving=%X\n", (size_t)&fn_driver);
-    logf("steering=%X\n", (size_t)&fn_steering);
-    logf("blinkers=%X\n", (size_t)&blinkers);
-
+    // logf("driving=%X\n", (size_t)&fn_driver);
+    // logf("steering=%X\n", (size_t)&fn_steering);
+    // logf("blinkers=%X\n", (size_t)&blinkers);
 
     servo_timer.init();
     pwm.init();
@@ -361,16 +374,13 @@ void timer_tick(void * p_context) {
         break;
     }
 
-    fn::ActiveTicks::tick_all();
+    timed::ActiveTickables::tick_all();
     // uart_pins.tick();
 }
 
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
 //     logf("ERROR %d %s:%d\n", err, filename, line);
 // }
-
-APP_TIMER_DEF(m_tick_timer);
-APP_TIMER_DEF(m_battery_timer);
 
 // APP_TIMER_DEF(m_pdm_timer);
 // void update_pdm(void * ctx) {
@@ -384,7 +394,7 @@ int main() {
     uint32_t err_code;
     err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
     APP_ERROR_CHECK(err_code);
-    app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Ticking::TICK_PERIOD_MS), nullptr);
+    fn::ActiveTickables::timer_needed_cb = fn::ActiveTickables::timer_needed_callback_t::create<ticking_cb>();
 
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
