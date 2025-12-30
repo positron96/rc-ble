@@ -137,6 +137,8 @@ fn::FlipFlopFn fn_bl_r_ff{&bl_right};
 APP_TIMER_DEF(m_tick_timer);
 APP_TIMER_DEF(m_battery_timer);
 
+timed::TickablesContainer<10> tickables_container;
+
 
 extern "C" void TIMER1_IRQHandler() {
     servo_timer.isr();
