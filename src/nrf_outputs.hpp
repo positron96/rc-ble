@@ -198,10 +198,11 @@ namespace nrf {
         static constexpr size_t NUM_PINS = NRF_PWM_CHANNEL_COUNT;
         static constexpr size_t MAX_PWM = 255;
 
-        struct HBridge: outputs::BaseHbridge {
+        /** Motor driver that is controlled by 2 PWM pins. */
+        struct DualPwmMotor: outputs::BaseMotor {
             size_t pin1, pin2;
 
-            HBridge(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
+            DualPwmMotor(size_t p1, size_t p2): pin1{p1}, pin2{p2} {}
 
             void set_raw(uint8_t val, bool fwd) override;
         private:
@@ -220,7 +221,7 @@ namespace nrf {
             friend class PWM;
         };
 
-        bool add_hbridge(HBridge &hbr) {
+        bool add_hbridge(DualPwmMotor &hbr) {
             if(available_pins()<2) return false;
             hbr.index = pins.size();
             hbr.owner = this;
@@ -301,7 +302,7 @@ namespace nrf {
 
     inline const uint16_t PWM::PWM_ZERO = PWM::add_edge(0);
 
-    inline void PWM::HBridge::set_raw(uint8_t val, bool fwd) {
+    inline void PWM::DualPwmMotor::set_raw(uint8_t val, bool fwd) {
         if(owner!=nullptr)
             owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
     };
@@ -315,7 +316,10 @@ namespace nrf {
     class Pin: public outputs::BasePin {
     public:
         size_t pin;
-        Pin(size_t num) : pin{num} { nrf_gpio_cfg_output(pin); }
+        Pin(size_t num) : pin{num} { init(); }
+        void init() override {
+            nrf_gpio_cfg_output(pin);
+        }
         void set(bool v) override {
             nrf_gpio_pin_write(pin, v ? 1 : 0);
         }

@@ -1,5 +1,4 @@
 #include "nrf_outputs.hpp"
-#include "nrf_outputs_pdm.hpp"
 #include "nrf_outputs_uart.hpp"
 #include "nrf_outputs_servo.hpp"
 #include "line_processor.h"
@@ -10,6 +9,7 @@
 #include "uart.hpp"
 
 #include <outputs.hpp>
+#include <outputs_pdm.hpp>
 #include <timed_utils.hpp>
 #include <functions/base_functions.hpp>
 #include <functions/car_functions.hpp>
@@ -83,31 +83,38 @@ constexpr size_t PIN_SERVO = D7;
 constexpr size_t PIN_COMM = UART_PIN;
 #endif
 
-nrf::PWM::HBridge hbridge{M1, M2};
+APP_TIMER_DEF(m_tick_timer);
+APP_TIMER_DEF(m_battery_timer);
+
+timed::TickList<10> ticklist;
+// things like PDM and DitheredMotor need this:
+// timed::DelegateList<5> fastticklist;
+
+nrf::PWM::DualPwmMotor motor{M1, M2};
 nrf::ServoTimer::Servo steer_servo{PIN_SERVO};
 nrf::Pin pin_light_left_hw{D5};
 nrf::Pin pin_light_right_hw{D6};
-// nrf::UartAnalogPin pin_light_left_uart{0};
-// nrf::UartAnalogPin pin_light_right_uart{1};
-// outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
-// outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
-auto &pin_light_left = pin_light_left_hw;
-auto &pin_light_right = pin_light_right_hw;
+nrf::UartAnalogPin pin_light_left_uart{0};
+nrf::UartAnalogPin pin_light_right_uart{1};
+outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
+outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_uart};
+// auto &pin_light_left = pin_light_left_hw;
+// auto &pin_light_right = pin_light_right_hw;
 
 nrf::Pin pin_light_main_hw{D1};
-//nrf::PdmPin pin_light_main{D1};
+// outputs::PdmPin pin_light_main{&pin_light_main_hw, &fastticklist};
 
 nrf::PWM::Pin pin_light_rear_red{D2};
 nrf::Pin pin_light_rev_hw{D3};
-// nrf::UartAnalogPin pin_light_rev_uart{4};
-// nrf::UartAnalogPin pin_light_main_uart{3};
+nrf::UartAnalogPin pin_light_rev_uart{4};
+nrf::UartAnalogPin pin_light_main_uart{3};
 
 outputs::MultiInputPin pin_light_red{&pin_light_rear_red};
 
-// outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
-// outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
-outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32)};
-outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
+outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32), &pin_light_main_uart};
+outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
+// outputs::MultiOutputPin pin_light_main{&pin_light_main_hw, pin_light_red.create_pin(32)};
+// outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
 fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
 auto &bl_left = blinkers.fn_left();
@@ -116,28 +123,24 @@ auto &fn_hazard = blinkers.fn_hazard();
 //fn::Blinker bl_left{&pin_light_left};
 //fn::Blinker bl_right{&pin_light_right};
 
-// nrf::UartAnalogPin pin_brake_uart{2};
-// outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
-outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
+nrf::UartAnalogPin pin_brake_uart{2};
+outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
+// outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
 
-fn::SimpleDriving fn_driver{&hbridge, &pin_light_rev, &pin_brake};
+fn::SimpleDriving fn_driver{&motor, &pin_light_rev, &pin_brake};
 fn::Steering fn_steering{&steer_servo, &bl_left, &bl_right};
-fn::Simple fn_main_light{&pin_light_main};
-//fn::Simple marker_light{&pin_light_marker};
+fn::PinFn fn_main_light{pin_light_main};
+//fn::PinFn marker_light{pin_light_marker};
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
-// nrf::UartOutputs<5> uart_pins;
+nrf::UartOutputs<5> uart_pins;
 
+//* To control blinkers with 2 bool functions, use this:
 fn::FlipFlopFn fn_bl_l_ff{&bl_left};
 fn::FlipFlopFn fn_bl_r_ff{&bl_right};
+//* To control blinkers with one analog function, use this:
 //fn::BinarySelector fn_blinker{&bl_left, &bl_right};
-
-
-APP_TIMER_DEF(m_tick_timer);
-APP_TIMER_DEF(m_battery_timer);
-
-timed::TickablesContainer<10> tickables_container;
 
 
 extern "C" void TIMER1_IRQHandler() {
@@ -148,7 +151,7 @@ uint32_t millis(void) {
     return app_timer_cnt_get() * 1000 / 32768;
 }
 
-void ticking_cb(bool running) {
+void set_tick_timer(bool running) {
     if(running) {
         app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Tickable::TICK_PERIOD_MS), nullptr);
     } else {
@@ -169,14 +172,15 @@ void setup() {
 
     storage::init();
 
-    pwm.add_hbridge(hbridge);
+    pwm.add_hbridge(motor);
     pwm.add_pin(pin_light_rear_red);
 
-    // uart_pins.add_pin(pin_light_left_uart);
-    // uart_pins.add_pin(pin_light_right_uart);
-    // uart_pins.add_pin(pin_light_main_uart);
-    // uart_pins.add_pin(pin_brake_uart);
-    // uart_pins.add_pin(pin_light_rev_uart);
+    uart_pins.add_pin(pin_light_left_uart);
+    uart_pins.add_pin(pin_light_right_uart);
+    uart_pins.add_pin(pin_light_main_uart);
+    uart_pins.add_pin(pin_brake_uart);
+    uart_pins.add_pin(pin_light_rev_uart);
+    ticklist.add(&uart_pins);
 
     steer_servo.inverted = true;
     if(!servo_timer.add_servo(steer_servo)) {
@@ -194,10 +198,6 @@ void setup() {
     functions.push_back(&fn_bl_r_ff);
     functions.push_back(&fn_bl_l_ff);
     functions.push_back(&fn_hazard);
-
-    // logf("driving=%X\n", (size_t)&fn_driver);
-    // logf("steering=%X\n", (size_t)&fn_steering);
-    // logf("blinkers=%X\n", (size_t)&blinkers);
 
     servo_timer.init();
     pwm.init();
@@ -232,7 +232,7 @@ void process_extra_cmd(const etl::string_view in) {
         }
     } else
     if(in.starts_with("!invert_drive=")) {
-        hbridge.inverted = in.at(14) == '1';
+        motor.inverted = in.at(14) == '1';
     } else
     if(in.starts_with("!name=")) {
         const auto new_name = in.substr(6);
@@ -376,8 +376,7 @@ void timer_tick(void * p_context) {
         break;
     }
 
-    timed::ActiveTickables::tick_all();
-    // uart_pins.tick();
+    ticklist.call_all();
 }
 
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
@@ -396,7 +395,7 @@ int main() {
     uint32_t err_code;
     err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
     APP_ERROR_CHECK(err_code);
-    fn::ActiveTickables::timer_needed_cb = fn::ActiveTickables::timer_needed_callback_t::create<ticking_cb>();
+    ticklist.evt_nonempty_cb = timed::list_nonempty_callback_t::create<set_tick_timer>();
 
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
