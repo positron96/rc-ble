@@ -22,28 +22,33 @@ namespace uart {
         return uart_inst->ENABLE == UARTE_ENABLE_ENABLE_Enabled;
     }
 
-    /** Sends data to UART using EasyDMA.
+    /**
+     * Sends data to UART using EasyDMA.
+     * Blocks until TX is completed.
      * Make sure data is in RAM!
      */
-    void write_ram(const char* msg, size_t len) {
+    void write_from_ram(const char* msg, size_t len) {
         nrf_uarte_tx_buffer_set(uart_inst, (uint8_t*)msg, len);
         nrf_uarte_task_trigger(uart_inst, NRF_UARTE_TASK_STARTTX);
         while(!nrf_uarte_event_check(uart_inst, NRF_UARTE_EVENT_ENDTX)) {}
         nrf_uarte_event_clear(uart_inst, NRF_UARTE_EVENT_ENDTX);
     }
 
+    /**
+     * Copies data to buffer (on stack), then sends it.
+     */
     void write_cpy(const char* msg, size_t len) {
         constexpr size_t bufsize = 128;
         char buf[bufsize];
         if (len>bufsize) len = bufsize;
         memcpy(buf, msg, len);
-        write_ram(buf, len);
+        write_from_ram(buf, len);
     }
 
     void write(const char* msg, size_t len) {
         const uintptr_t  p = (const uintptr_t)msg;
         if(p>=0x2000000 && p<0x3FFFFFFF) { // full 0.5GB of SRAM
-            write_ram(msg, len);
+            write_from_ram(msg, len);
         } else {
             write_cpy(msg, len);
         }

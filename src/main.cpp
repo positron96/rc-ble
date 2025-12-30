@@ -14,6 +14,7 @@
 #include <functions/base_functions.hpp>
 #include <functions/car_functions.hpp>
 #include <functions/blinkers.hpp>
+#include <functions/light_fx.hpp>
 
 #include <etl/vector.h>
 #include <etl/string_view.h>
@@ -64,8 +65,17 @@ constexpr size_t DA = 9;
 constexpr size_t DB = 10;
 constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
-constexpr size_t PIN_SERVO = DA;
-constexpr size_t PIN_COMM = DB;
+constexpr size_t PIN_AUX1       = D0;
+constexpr size_t PIN_AUX2       = D1;
+constexpr size_t PIN_AUX3       = D2;
+constexpr size_t PIN_LEFT       = D3;
+constexpr size_t PIN_RIGHT      = D4;
+constexpr size_t PIN_HEADLIGHTS = D5;
+constexpr size_t PIN_MARKERS    = D6;
+constexpr size_t PIN_REV       = D7;
+constexpr size_t PIN_BRAKES     = D8;
+constexpr size_t PIN_SERVO      = DA;
+constexpr size_t PIN_COMM       = DB;
 
 #else // BLE_RC_V10 or devboard
 constexpr size_t BAT_PIN = 30;
@@ -80,7 +90,11 @@ constexpr size_t D7 = 20;
 constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
 constexpr size_t PIN_SERVO = D7;
-constexpr size_t PIN_COMM = UART_PIN;
+#ifdef UART_PIN
+  constexpr size_t PIN_COMM = UART_PIN;
+#else
+  constexpr size_t PIN_COMM = D4;
+#endif
 #endif
 
 APP_TIMER_DEF(m_tick_timer);
@@ -92,8 +106,8 @@ timed::TickList<10> ticklist;
 
 nrf::PWM::DualPwmMotor motor{M1, M2};
 nrf::ServoTimer::Servo steer_servo{PIN_SERVO};
-nrf::Pin pin_light_left_hw{D5};
-nrf::Pin pin_light_right_hw{D6};
+nrf::Pin pin_light_left_hw{PIN_LEFT};
+nrf::Pin pin_light_right_hw{PIN_RIGHT};
 nrf::UartAnalogPin pin_light_left_uart{0};
 nrf::UartAnalogPin pin_light_right_uart{1};
 outputs::MultiOutputPin pin_light_left{&pin_light_left_hw, &pin_light_left_uart};
@@ -101,11 +115,11 @@ outputs::MultiOutputPin pin_light_right{&pin_light_right_hw, &pin_light_right_ua
 // auto &pin_light_left = pin_light_left_hw;
 // auto &pin_light_right = pin_light_right_hw;
 
-nrf::Pin pin_light_main_hw{D1};
+nrf::Pin pin_light_main_hw{PIN_HEADLIGHTS};
 // outputs::PdmPin pin_light_main{&pin_light_main_hw, &fastticklist};
 
-nrf::PWM::Pin pin_light_rear_red{D2};
-nrf::Pin pin_light_rev_hw{D3};
+nrf::PWM::Pin pin_light_rear_red{PIN_BRAKES};
+nrf::Pin pin_light_rev_hw{PIN_REV};
 nrf::UartAnalogPin pin_light_rev_uart{4};
 nrf::UartAnalogPin pin_light_main_uart{3};
 
@@ -129,8 +143,16 @@ outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart
 
 fn::SimpleDriving fn_driver{&motor, &pin_light_rev, &pin_brake};
 fn::Steering fn_steering{&steer_servo, &bl_left, &bl_right};
+
 fn::PinFn fn_main_light{pin_light_main};
-//fn::PinFn marker_light{pin_light_marker};
+
+nrf::Pin pin_light_marker{PIN_MARKERS};
+fn::PinFn fn_markers{pin_light_marker};
+
+nrf::Pin pin_aux1{PIN_AUX1};
+nrf::Pin pin_aux2{PIN_AUX2};
+lightfx::DualLightController fn_light{&pin_aux1, &pin_aux2};
+
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
@@ -161,10 +183,10 @@ void set_tick_timer(bool running) {
 
 
 void setup() {
-    uart::init(PIN_COMM);
+    uart::init(PIN_COMM, PIN_AUX3);
     uart::puts("uart init\n");
     log_init();
-    logs("\nBLE-RC\n");
+    logln("BLE-RC");
     app_timer_init();
 
     ret_code_t err_code = nrf_sdh_enable_request();
@@ -193,7 +215,7 @@ void setup() {
     functions.push_back(&fn_driver);
     functions.push_back(&fn_steering);
     functions.push_back(&fn_main_light);
-    //functions.push_back(&marker_light);
+    functions.push_back(&fn_markers);
     //functions.push_back(&fn_blinker);
     functions.push_back(&fn_bl_r_ff);
     functions.push_back(&fn_bl_l_ff);

@@ -43,12 +43,15 @@ void _logln(const char* msg) {
     }
 
     void logln(const char* msg) {
-        _logln(msg);
+        logs("!");
+        logs(msg);
+        logs("\n");
     }
 
     /** Not reentrant! */
     void vlogf(const char * fmt, va_list args) {
         vsnprintf(txbuf, bufsize, fmt, args);
+        logs("!");
         logs(txbuf);
     }
 
