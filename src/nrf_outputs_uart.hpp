@@ -2,6 +2,7 @@
 #define NRF_FUNCTIONS_UART_H_
 
 #include <outputs.hpp>
+#include <timed_utils.hpp>
 #include <functions/base_functions.hpp>
 
 #include "uart.hpp"
@@ -55,7 +56,7 @@ namespace nrf {
 #ifdef NO_UART_PINS
 
     template<size_t MAX_PINS>
-    class UartOutputs: public fn::Ticking, public BaseUartPinOutput {
+    class UartOutputs: public fn::Tickable, public BaseUartPinOutput {
     public:
         constexpr static size_t REFRESH_INTERVAL = ms_to_ticks(1000);
 
@@ -72,7 +73,7 @@ namespace nrf {
 #else
 
     template<size_t MAX_PINS>
-    class UartOutputs: public fn::Ticking, public BaseUartPinOutput {
+    class UartOutputs: public timed::Tickable, public BaseUartPinOutput {
     public:
         constexpr static size_t REFRESH_INTERVAL = ms_to_ticks(1000);
 

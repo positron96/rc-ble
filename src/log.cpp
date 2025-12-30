@@ -33,6 +33,7 @@ void _logln(const char* msg) {
     }
 
     void logs(const char* msg) {
+        if(!uart::is_inited()) return;
         size_t l = strlen(msg);
         if(l>bufsize) l = bufsize;
         if(msg != txbuf) {
