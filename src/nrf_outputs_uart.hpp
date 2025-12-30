@@ -15,13 +15,20 @@ namespace nrf {
         friend class UartAnalogPin;
     };
 
+#ifdef NO_UART_PINS
+    struct UartAnalogPin: outputs::BaseAnalogPin {
+        UartAnalogPin(size_t pin) {}
+        void set_pwm(uint8_t val) override { }
+        void force_update() {}
+    }
+#else
     /**
      * A pin that sends its state to UART.
      *
      * The output format is "P1=200\n", where 1 is pin nimber and 200 is PWM value.
      */
     struct UartAnalogPin: outputs::BaseAnalogPin {
-        size_t remote_pin;
+        const size_t remote_pin;
         int16_t last_val;
 
         UartAnalogPin(size_t pin): remote_pin{pin}, last_val{-1} {};
@@ -52,6 +59,7 @@ namespace nrf {
             return 0;
         }
     };
+#endif
 
 #ifdef NO_UART_PINS
 
@@ -60,12 +68,8 @@ namespace nrf {
     public:
         constexpr static size_t REFRESH_INTERVAL = ms_to_ticks(1000);
 
-        bool add_pin(UartAnalogPin &pin) {
-            return true;
-        }
-
+        bool add_pin(UartAnalogPin &pin) { return true;  }
         void tick() override { }
-
         void send_pin(UartAnalogPin *p) override {  }
 
     };
@@ -80,7 +84,7 @@ namespace nrf {
         //UartOutputs() {}
 
         bool add_pin(UartAnalogPin &pin) {
-            if(pins.available()==0) { return false; }
+            if(pins.available()==0) { logs("!OUT OF UART PINS"); return false; }
             pins.push_back(&pin);
             pin.owner = this;
             return true;
