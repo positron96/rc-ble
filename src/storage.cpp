@@ -139,7 +139,7 @@ namespace storage {
             return etl::nullopt;
         }
 
-        logf("Found Rec ID %X\n", desc.record_id);
+        logf("Found Rec ID 0x%X\n", desc.record_id);
 
         fds_flash_record_t config = {0};
         rc = fds_record_open(&desc, &config);

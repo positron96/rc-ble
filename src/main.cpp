@@ -162,15 +162,15 @@ void setup() {
     // uart_pins.add_pin(pin_brake_uart);
     // uart_pins.add_pin(pin_light_rev_uart);
 
-    functions.push_back(&fn_driver);
-
     steer_servo.inverted = true;
-
     if(!servo_timer.add_servo(steer_servo)) {
         logln("servo add err");
         while(1){}
     }
 
+    fn_steering.auto_blinker_on = true;
+
+    functions.push_back(&fn_driver);
     functions.push_back(&fn_steering);
     functions.push_back(&fn_main_light);
     //functions.push_back(&marker_light);
@@ -178,6 +178,11 @@ void setup() {
     functions.push_back(&fn_bl_r_ff);
     functions.push_back(&fn_bl_l_ff);
     functions.push_back(&fn_hazard);
+
+    logf("driving=%X\n", (size_t)&fn_driver);
+    logf("steering=%X\n", (size_t)&fn_steering);
+    logf("blinkers=%X\n", (size_t)&blinkers);
+
 
     servo_timer.init();
     pwm.init();
@@ -286,7 +291,7 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 void update_battery(void * p_context) {
     uint32_t v = analogRead(BAT_ADC_CH);
-    logf("got ADC, %d\n", v);
+    //logf("got ADC, %d\n", v);
     v = v * (27+68)/68 * 600 * 5 / 1024;  // mV at VCC, 0.6V ref, 1/5 gain
     //v = v * 600 * 5 / 1024;  // in mV at ADC pin, 0.6V ref, 1/5 gain
     v = std::clamp(v, 3300ul, 4200ul);
@@ -311,7 +316,6 @@ void timer_tick(void * p_context) {
 
     static size_t last_clients = 1; // do disconnection logic on boot
     static size_t disconnect_time = 0;
-    static size_t ticks;
 
     size_t clients = ble::get_connected_clients_count();
 
@@ -329,7 +333,7 @@ void timer_tick(void * p_context) {
         servo_timer.wake();
         pwm.wake();
         blinkers.set_period(1000);
-        blinkers.fn_hazard().set(false);
+        blinkers.set_off();
         for(auto &fn: functions) fn->wake();
     }
 
@@ -337,6 +341,7 @@ void timer_tick(void * p_context) {
 
     switch(state) {
     case State::Hibernation: {
+        // do short flash every 10s
         static size_t last_flash = 0;
         if(millis() - last_flash > 10000) {
             blinkers.set_all(true);
@@ -348,23 +353,15 @@ void timer_tick(void * p_context) {
     }
     case State::RecentlyDisconnected:
         if(millis() - disconnect_time > 5000) {
-            blinkers.set_all(false);
+            blinkers.set_off();
             state = State::Hibernation;
         }
         break;
     case State::Running:
-        // fn_driver.tick();
-        // fn_steering.tick();
         break;
     }
 
-    ticks++;
-
     fn::ActiveTicks::tick_all();
-
-    //bl_right.tick();
-    //bl_left.tick();
-    //blinkers.tick();
     // uart_pins.tick();
 }
 
