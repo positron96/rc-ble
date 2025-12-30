@@ -353,15 +353,18 @@ void timer_tick(void * p_context) {
         }
         break;
     case State::Running:
-        fn_driver.tick();
-        fn_steering.tick();
+        // fn_driver.tick();
+        // fn_steering.tick();
         break;
     }
 
     ticks++;
+
+    fn::ActiveTicks::tick_all();
+
     //bl_right.tick();
     //bl_left.tick();
-    blinkers.tick();
+    //blinkers.tick();
     // uart_pins.tick();
 }
 
