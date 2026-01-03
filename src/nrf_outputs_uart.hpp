@@ -20,7 +20,7 @@ namespace nrf {
         UartAnalogPin(size_t pin) {}
         void set_pwm(uint8_t val) override { }
         void force_update() {}
-    }
+    };
 #else
     /**
      * A pin that sends its state to UART.
@@ -54,6 +54,7 @@ namespace nrf {
         BaseUartPinOutput *owner = nullptr;
 
         size_t add_data(char* dst, const size_t size) {
+            if(last_val==-1) return 0;
             int r = snprintf(dst, size, "P%d=%d", remote_pin, last_val);
             if(r>=0 && r<(int)size) return r;
             return 0;
@@ -99,9 +100,12 @@ namespace nrf {
                     if(p->ticks_left == 0) {
                         //send_pin(p);
                         //logf("printing at %d\n", pos-msg);
-                        pos += p->add_data(msg+pos, sizeof(msg)-pos);
-                        msg[pos] = ';'; pos++;
+                        size_t ln = p->add_data(msg+pos, sizeof(msg)-pos);
                         p->ticks_left = REFRESH_INTERVAL;
+                        if(ln!=0) {
+                            pos += ln;
+                            msg[pos] = ';'; pos++;
+                        }
                     }
                 }
                 if(pos!=0) {
