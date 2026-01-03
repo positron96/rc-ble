@@ -9,7 +9,7 @@
 #include "uart.hpp"
 
 #include <outputs.hpp>
-#include <outputs_pdm.hpp>
+#include <dithered_motor.hpp>
 #include <timed_utils.hpp>
 #include <functions/base_functions.hpp>
 #include <functions/car_functions.hpp>
@@ -70,12 +70,12 @@ constexpr size_t PIN_AUX2       = D1;
 constexpr size_t PIN_AUX3       = D2;
 constexpr size_t PIN_LEFT       = D3;
 constexpr size_t PIN_RIGHT      = D4;
-constexpr size_t PIN_HEADLIGHTS = D5;
-constexpr size_t PIN_MARKERS    = D6;
-constexpr size_t PIN_REV       = D7;
-constexpr size_t PIN_BRAKES     = D8;
+constexpr size_t PIN_BRAKES     = D5;
+constexpr size_t PIN_REV        = D6;
+constexpr size_t PIN_MARKERS    = D7;
+constexpr size_t PIN_HEADLIGHTS = D8;
 constexpr size_t PIN_SERVO      = DA;
-constexpr size_t PIN_COMM       = DB;
+constexpr size_t PIN_COMM_TX    = DB;
 
 #else // BLE_RC_V10 or devboard
 constexpr size_t BAT_PIN = 30;
@@ -98,13 +98,15 @@ constexpr size_t PIN_SERVO = D7;
 #endif
 
 APP_TIMER_DEF(m_tick_timer);
+APP_TIMER_DEF(m_fast_timer);
 APP_TIMER_DEF(m_battery_timer);
 
 timed::TickList<10> ticklist;
 // things like PDM and DitheredMotor need this:
-// timed::DelegateList<5> fastticklist;
+timed::DelegateList<5> fastticklist;
 
 nrf::PWM::DualPwmMotor motor{M1, M2};
+// outputs::DitheredMotor motor{motor_hw, 70, fastticklist};
 nrf::ServoTimer::Servo steer_servo{PIN_SERVO};
 nrf::Pin pin_light_left_hw{PIN_LEFT};
 nrf::Pin pin_light_right_hw{PIN_RIGHT};
@@ -131,6 +133,7 @@ outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
 // outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
 fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
+//TODO: replace Fns with Pins here
 auto &bl_left = blinkers.fn_left();
 auto &bl_right = blinkers.fn_right();
 auto &fn_hazard = blinkers.fn_hazard();
@@ -173,11 +176,20 @@ uint32_t millis(void) {
     return app_timer_cnt_get() * 1000 / 32768;
 }
 
-void set_tick_timer(bool running) {
+// void set_tick_timer(bool running) {
+//     if(running) {
+//         app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Tickable::TICK_PERIOD_MS), nullptr);
+//     } else {
+//         app_timer_stop(m_tick_timer);
+//     }
+// }
+
+void enable_fast_timer(bool running) {
+    logf("enable_fast_timer(%d)\n", running);
     if(running) {
-        app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Tickable::TICK_PERIOD_MS), nullptr);
+        app_timer_start(m_fast_timer, APP_TIMER_TICKS(1), nullptr);
     } else {
-        app_timer_stop(m_tick_timer);
+        app_timer_stop(m_fast_timer);
     }
 }
 
@@ -193,6 +205,10 @@ void setup() {
     APP_ERROR_CHECK(err_code);
 
     storage::init();
+
+    timed::AutoTickable::set_ticklist(ticklist);
+
+    fastticklist.evt_nonempty_cb = timed::list_nonempty_callback_t::create<enable_fast_timer>();
 
     pwm.add_hbridge(motor);
     pwm.add_pin(pin_light_rear_red);
@@ -292,7 +308,7 @@ void process_str(etl::string_view in) {
         case 'E': fn = &fn_hazard; break;
         case 'L': fn = &fn_bl_l_ff; break;
         case 'R': fn = &fn_bl_r_ff; break;
-        //case 'M': fn = &fn_marker; break;
+        case 'M': fn = &fn_markers; break;
         default: {
             const auto ch_opt = parse(token.value());
             if(ch_opt.has_value()) {
@@ -302,18 +318,18 @@ void process_str(etl::string_view in) {
         }
     }
     if(fn == nullptr) {
-        logf("bad channel: '%.*s'\n", FMT_SV(in));
+        logf("Bad func: '%.*s'\n", FMT_SV(in));
         return;
     }
 
     token = etl::get_token(in, ", ", token, true);
-    if(!token) { logf("no value: '%.*s'\n", FMT_SV(in));  return; }
+    if(!token) { logf("No value: '%.*s'\n", FMT_SV(in));  return; }
     const auto val_opt = parse<fn::val_t>(token.value());
-    if(!val_opt) { logf("val parsing failed: '%.*s'\n", FMT_SV(in)); return; }
+    if(!val_opt) { logf("Val parsing failed: '%.*s'\n", FMT_SV(in)); return; }
 
     auto val = val_opt.value();
     if(fn!=&fn_driver && fn!=&fn_steering)
-        logf("ch %d = %d\n",
+        logf("Fn %d = %d\n",
             std::distance(
                 functions.begin(),
                 std::find(functions.begin(), functions.end(), fn)),
@@ -363,7 +379,9 @@ void timer_tick(void * p_context) {
         blinkers.fn_hazard().set(true);
         servo_timer.sleep();
         pwm.sleep();
+        //TODO: send UartOutputs to sleep
         state = State::RecentlyDisconnected;
+        logs("State is now 'RecentlyDisconnected'\n");
     } else
     if(clients != 0 && last_clients==0) {
         state = State::Running;
@@ -372,6 +390,7 @@ void timer_tick(void * p_context) {
         blinkers.set_period(1000);
         blinkers.set_off();
         for(auto &fn: functions) fn->wake();
+        logs("State is now 'Running'\n");
     }
 
     last_clients = clients;
@@ -392,6 +411,7 @@ void timer_tick(void * p_context) {
         if(millis() - disconnect_time > 5000) {
             blinkers.set_off();
             state = State::Hibernation;
+            logs("State is now 'Hibernation'\n");
         }
         break;
     case State::Running:
@@ -401,13 +421,12 @@ void timer_tick(void * p_context) {
     ticklist.call_all();
 }
 
+void fasttimer_tick(void * ctx) {
+    fastticklist.call_all();
+}
+
 // void app_error_handler(ret_code_t err, uint32_t line, const uint8_t * filename) {
 //     logf("ERROR %d %s:%d\n", err, filename, line);
-// }
-
-// APP_TIMER_DEF(m_pdm_timer);
-// void update_pdm(void * ctx) {
-//     pin_light_main.tick();
 // }
 
 int main() {
@@ -417,15 +436,16 @@ int main() {
     uint32_t err_code;
     err_code = app_timer_create(&m_tick_timer, APP_TIMER_MODE_REPEATED, timer_tick);
     APP_ERROR_CHECK(err_code);
-    ticklist.evt_nonempty_cb = timed::list_nonempty_callback_t::create<set_tick_timer>();
+    // ticklist.evt_nonempty_cb = timed::list_nonempty_callback_t::create<set_tick_timer>();
+
+    app_timer_start(m_tick_timer, APP_TIMER_TICKS(fn::Tickable::TICK_PERIOD_MS), nullptr);
 
     err_code = app_timer_create(&m_battery_timer, APP_TIMER_MODE_REPEATED, update_battery);
     APP_ERROR_CHECK(err_code);
     app_timer_start(m_battery_timer, APP_TIMER_TICKS(15000), nullptr);
 
-    // err_code = app_timer_create(&m_pdm_timer, APP_TIMER_MODE_REPEATED, update_pdm);
-    // APP_ERROR_CHECK(err_code);
-    // app_timer_start(m_pdm_timer, APP_TIMER_TICKS(1), nullptr);
+    err_code = app_timer_create(&m_fast_timer, APP_TIMER_MODE_REPEATED, fasttimer_tick);
+    APP_ERROR_CHECK(err_code);
 
     while(1) {
         nrf_pwr_mgmt_run();
