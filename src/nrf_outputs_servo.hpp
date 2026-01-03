@@ -7,7 +7,7 @@
 namespace nrf {
 
     /**
-     * Generate servo pulses with a timer,
+     * Generates servo pulses with a timer,
      * but controls pins from timer interrupt.
      *
      * Can handle much more servo outputs and does not occupy PPI channels than ServoTimer.

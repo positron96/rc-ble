@@ -26,10 +26,10 @@ void _logln(const char* msg) {
     constexpr size_t bufsize = 128;
     char txbuf[bufsize];
 
+    /** Logging does not know how to initialize UART, so do nothing.
+     * UART must be initialized elsewhere.
+     */
     void log_init() {
-        if(!uart::is_inited()) {
-            uart::init();
-        }
     }
 
     void logs(const char* msg) {
@@ -43,7 +43,7 @@ void _logln(const char* msg) {
     }
 
     void logln(const char* msg) {
-        logs("!");
+        //logs("!");
         logs(msg);
         logs("\n");
     }
@@ -51,7 +51,7 @@ void _logln(const char* msg) {
     /** Not reentrant! */
     void vlogf(const char * fmt, va_list args) {
         vsnprintf(txbuf, bufsize, fmt, args);
-        logs("!");
+        //logs("!");
         logs(txbuf);
     }
 

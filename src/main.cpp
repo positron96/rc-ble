@@ -91,9 +91,9 @@ constexpr size_t M1 = 25;
 constexpr size_t M2 = 28;
 constexpr size_t PIN_SERVO = D7;
 #ifdef UART_PIN
-  constexpr size_t PIN_COMM = UART_PIN;
+  constexpr size_t PIN_COMM_TX = UART_PIN;
 #else
-  constexpr size_t PIN_COMM = D4;
+  constexpr size_t PIN_COMM_TX = D4;
 #endif
 #endif
 
@@ -183,7 +183,7 @@ void set_tick_timer(bool running) {
 
 
 void setup() {
-    uart::init(PIN_COMM, PIN_AUX3);
+    uart::init(PIN_COMM_TX);
     uart::puts("uart init\n");
     log_init();
     logln("BLE-RC");

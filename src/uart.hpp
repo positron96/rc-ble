@@ -12,7 +12,7 @@ namespace uart {
     constexpr size_t PIN_RX = 15;
     constexpr size_t PIN_DISCONNECT = 0xFFFF'FFFF;
 
-    void init(size_t pin_tx = PIN_TX, size_t pix_rx = PIN_DISCONNECT);
+    void init(size_t pin_tx, size_t pix_rx = PIN_DISCONNECT);
     bool is_inited();
     void puts(const char* msg);
     void write(const char* msg, size_t len);
