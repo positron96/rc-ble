@@ -34,7 +34,7 @@ At the moment there are these possible options:
  * Hardware remote that uses ESP32.
    Description here: https://github.com/positron96/rc-ble-transmitter.
  * (Experimental) Web-based controller utilising Web Bluetooth standard.
-   Should work on a lot of smartphones without the need to install anything.   
+   Should work on a lot of smartphones without the need to install anything.
    Launch it from here: https://positron96.github.io/rc-ble/.
    Source is in link:webtx[this folder].
 
@@ -71,4 +71,3 @@ https://docs.nordicsemi.com/bundle/sds_s112/page/SDS/s1xx/sd_resource_reqs/hw_bl
 https://novelbits.io/nrf52-ota-dfu-ble-part-4/ - an short tutorial of DFU OTA
 
 https://devzone.nordicsemi.com/guides/short-range-guides/b/software-development-kit/posts/getting-started-with-nordics-secure-dfu-bootloader - a Nordic article about DFU.
-

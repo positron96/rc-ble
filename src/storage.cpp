@@ -87,6 +87,29 @@ namespace storage {
 
         event_result = -1;
         rc = fds_init();
+        if(rc == FDS_ERR_NO_PAGES) {
+            /**
+             If something (e.g. FW update) overwrites FDS,
+             there is no straightforward way to re-init FDS,
+             only manual flash clearing or wiping the whole chip.
+             */
+            logf("FDS reports no_pages; panic");
+            while(1) {} ;
+
+            // extern nrf_fstorage_t m_fs;
+            // nrf_fstorage_erase(&m_fs, );
+
+            // uint32_t flash_size  = (FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof(uint32_t));
+            // uint32_t end_addr   = flash_end_addr();
+            // uint32_t start_addr = end_addr - flash_size;
+
+
+            // uint32_t const *addr = FS_PAGE_END_ADDR;
+            // for (int i = 1; i < (FDS_VIRTUAL_PAGES + 1); i++)  {
+            //     uint32_t curr_addr = (uint32_t)addr - (FDS_PAGE_SIZE*i);
+            //     nrf_nvmc_page_erase(curr_addr);
+            // }
+        }
         APP_ERROR_CHECK(rc);
         while (event_result==-1)  { (void) sd_app_evt_wait(); }
 
@@ -131,7 +154,7 @@ namespace storage {
         ret_code_t rc = fds_record_find(CONFIG_FILE_ID, REC_DEVNAME_KEY, &desc, &tok);
 
         if(rc == FDS_ERR_NOT_FOUND) {
-            logf("FDS_ERR_NOT_FOUND\n");
+            logf("get_dev_name: FDS_ERR_NOT_FOUND\n");
             return etl::nullopt;
         } else
         if (rc != NRF_SUCCESS)  {

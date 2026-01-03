@@ -446,7 +446,7 @@ extern "C" {
     }
 
     void app_error_handler_bare(uint32_t error_code) {
-        uart::printf("error_bare: 0x%08x!\n", error_code);
+        uart::printf("error_bare: SD err=0x%08x!\n", error_code);
         on_error();
     }
 
