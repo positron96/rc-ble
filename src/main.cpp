@@ -32,7 +32,7 @@
 
 volatile uint8_t val;
 
-etl::vector<fn::Fn*, 10> functions;
+etl::vector<fn::Fn*, 14> functions;
 
 #if defined(BLE_RC_V12)  // BLE-RC 1.2
 
@@ -133,16 +133,14 @@ outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw, &pin_light_rev_uart};
 // outputs::MultiOutputPin pin_light_rev{&pin_light_rev_hw};
 
 fn::Blinkers blinkers{&pin_light_left, &pin_light_right};
-//TODO: replace Fns with Pins here
-auto &bl_left = blinkers.fn_left();
-auto &bl_right = blinkers.fn_right();
+auto &bl_left = blinkers.left();
+auto &bl_right = blinkers.right();
 auto &fn_hazard = blinkers.fn_hazard();
 //fn::Blinker bl_left{&pin_light_left};
 //fn::Blinker bl_right{&pin_light_right};
 
 nrf::UartAnalogPin pin_brake_uart{2};
 outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255), &pin_brake_uart};
-// outputs::MultiOutputPin pin_brake{pin_light_red.create_pin(255)};
 
 fn::SimpleDriving fn_driver{&motor, &pin_light_rev, &pin_brake};
 fn::Steering fn_steering{&steer_servo, &bl_left, &bl_right};
@@ -154,18 +152,20 @@ fn::PinFn fn_markers{pin_light_marker};
 
 nrf::Pin pin_aux1{PIN_AUX1};
 nrf::Pin pin_aux2{PIN_AUX2};
-lightfx::DualLightController fn_light{&pin_aux1, &pin_aux2};
+lightfx::DualLightController fn_aux_light{&pin_aux1, &pin_aux2};
 
 
 nrf::ServoTimer servo_timer;
 nrf::PWM pwm;
 nrf::UartOutputs<5> uart_pins;
 
+auto fn_bl_l = fn::PinFn{bl_left};
+auto fn_bl_r = fn::PinFn{bl_right};
 //* To control blinkers with 2 bool functions, use this:
-fn::FlipFlopFn fn_bl_l_ff{&bl_left};
-fn::FlipFlopFn fn_bl_r_ff{&bl_right};
+fn::FlipFlopFn<fn::PinFn> fn_bl_l_ff{fn_bl_l};
+fn::FlipFlopFn<fn::PinFn> fn_bl_r_ff{fn_bl_r};
 //* To control blinkers with one analog function, use this:
-//fn::BinarySelector fn_blinker{&bl_left, &bl_right};
+// fn::BinarySelector fn_blinker{&fn_bl_l, &fn_bl_r};
 
 
 extern "C" void TIMER1_IRQHandler() {
@@ -232,10 +232,11 @@ void setup() {
     functions.push_back(&fn_steering);
     functions.push_back(&fn_main_light);
     functions.push_back(&fn_markers);
-    //functions.push_back(&fn_blinker);
     functions.push_back(&fn_bl_r_ff);
     functions.push_back(&fn_bl_l_ff);
+    //functions.push_back(&fn_blinker); // or this one instead of above 2
     functions.push_back(&fn_hazard);
+    functions.push_back(&fn_aux_light);
 
     servo_timer.init();
     pwm.init();
