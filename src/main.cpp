@@ -343,15 +343,20 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 }
 
 void update_battery(void * p_context) {
-    uint32_t v = analogRead(BAT_ADC_CH);
-    //logf("got ADC, %d\n", v);
-    v = v * (27+68)/68 * 600 * 5 / 1024;  // mV at VCC, 0.6V ref, 1/5 gain
-    //v = v * 600 * 5 / 1024;  // in mV at ADC pin, 0.6V ref, 1/5 gain
-    v = std::clamp(v, 3300ul, 4200ul);
-    v = map(v, 3300, 4200, 0, 100);
-    //v = map(v, 0, 3000, 0, 100);
-    //v = v / 100; // 3000mV -> 30
-    ble::set_bas(v);
+    uint32_t raw = analogRead(BAT_ADC_CH);
+    uint32_t v = raw * 600 * 5 / 1024;  // in mV at ADC pin, 600mV ref, 1/5 gain
+    // voltage at VBAT pin, compensated for resistors
+#ifdef BLE_RC_V12
+    v = v * (47+100)/100;
+#elif defined(BLE_RC_V10)
+    v = v * (27+68)/68;
+#endif
+    unsigned p = std::clamp(v, 3200ul, 4200ul);
+    p = map(p, 3200, 4200, 0, 100);
+    // logf("got ADC=%d %dmV %d%%\n", raw, v, p);
+    //* debugging version to send decivolts:
+    //p = map(v, 0, 3000, 0, 100); p = p / 100; // 3000mV -> 30
+    ble::set_bas(p);
 }
 
 
