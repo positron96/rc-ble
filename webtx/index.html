@@ -43,6 +43,7 @@
     let gamepadIndex = null;
     let gamepadInterval = null;
     let prevButtonStates = [];
+    let prevGamepadAxes = [0,0];
 
 
     function log(message) {
@@ -66,7 +67,7 @@
         txCharacteristic = await nusService.getCharacteristic(txCharUUID);
         rxCharacteristic = await nusService.getCharacteristic(rxCharUUID);
 
-        rxCharacteristic.startNotifications();
+        await rxCharacteristic.startNotifications();
         rxCharacteristic.addEventListener('characteristicvaluechanged', event => {
           const decoder = new TextDecoder();
           const value = decoder.decode(event.target.value);
@@ -79,18 +80,19 @@
             updateBatteryLevel();
 
             await batteryChar.startNotifications();
-            batteryChar.addEventListener('characteristicvaluechanged', updateBatteryLevel);
+            batteryChar.addEventListener('characteristicvaluechanged', event => {
+              setBatteryLevel(event.target.value);
+            });
         } catch (error) {
             log('Battery service not found. Skipping.');
         }
-
 
         document.getElementById('disconnectBtn').disabled = false;
 
         log('Connected to device');
       } catch (error) {
         console.error('Bluetooth connection failed:', error);
-        log('Connection failed. Make sure the device is in range and supports the required services.');
+        log('Connection failed: '+error);
         document.getElementById('connectBtn').disabled = false; // Re-enable on failure
       }
     }
@@ -101,19 +103,17 @@
       }
     }
 
-    function updateBatteryLevel(event) {
-      let value;
-      if (event && event.target?.value) {
-        value = event.target.value.getUint8(0);
-      } else if (batteryChar) {
+    function updateBatteryLevel() {
+      if (batteryChar) {
         batteryChar.readValue().then(val => {
-          document.getElementById('battery').textContent = `Battery: ${val.getUint8(0)}%`;
-        }).catch(err => log('Could not read battery level.'));
-        return;
+          setBatteryLevel(val);
+        }).catch(err => log('Could not read battery level: '+err));
       }
-      if (typeof value === 'number') {
-        document.getElementById('battery').textContent = `Battery: ${value}%`;
-      }
+    }
+
+    function setBatteryLevel(dv) {
+      let value = dv.getUint8(0);
+      document.getElementById('battery').textContent = `Battery: ${value}%`;
     }
 
     function onDisconnected(event) {
@@ -127,6 +127,7 @@
     function sendCommand(command) {
       if (!txCharacteristic) {
         // Silently fail if not connected, to avoid flooding the log
+        // log("not sending, not connected");
         return;
       }
       try {
@@ -188,13 +189,30 @@
       ctx.fill();
     }
 
+    // Apply deadzone compensation and scale value from -1..1 to -127..127 range
+    function applyDeadzoneAndScale(value) {
+      const maxValue = 127;
+      value = Math.max(-maxValue, Math.min(maxValue, value * maxValue));
+      const deadzone = 5;
+
+      const scaleFactor = maxValue / (maxValue - deadzone);
+
+      if (Math.abs(value) <= deadzone) {
+        return 0;
+      } else if (value > 0) {
+        return Math.round((value - deadzone) * scaleFactor);
+      } else {
+        return Math.round((value + deadzone) * scaleFactor);
+      }
+    }
+
     function handleJoystick(x, y) {
       drawJoystick(x, y);
       const dx = x - center.x;
       const dy = y - center.y;
       const max = Math.min(canvas.width, canvas.height) * 0.45;
-      const d = Math.max(-127, Math.min(127, -Math.round(dy / max * 127)));
-      const s = Math.max(-127, Math.min(127, Math.round(dx / max * 127)));
+      const d = applyDeadzoneAndScale(-dy/max);
+      const s = applyDeadzoneAndScale(dx/max);
       sendCommand(`D=${d}\nS=${s}\n`);
     }
 
@@ -250,7 +268,6 @@
         // Axes
         let axisX = gamepad.axes[0];
         let axisY = gamepad.axes[1];
-        const deadzone = 0.1;
 
         // --- Use B6-B7 difference for Y axis override ---
         // B6: gamepad.buttons[6], B7: gamepad.buttons[7]
@@ -263,17 +280,19 @@
             }
         }
 
-        if (Math.abs(axisX) < deadzone) axisX = 0;
-        if (Math.abs(axisY) < deadzone) axisY = 0;
-
         const max = Math.min(canvas.width, canvas.height) * 0.45;
         const jX = center.x + axisX * max;
         const jY = center.y + axisY * max;
         drawJoystick(jX, jY);
 
-        const d = Math.max(-127, Math.min(127, -Math.round(axisY * 127)));
-        const s = Math.max(-127, Math.min(127, Math.round(axisX * 127)));
-        sendCommand(`D=${d}\nS=${s}\n`);
+        const d = applyDeadzoneAndScale(-axisY);
+        const s = applyDeadzoneAndScale(axisX);
+        // send only if changed to avoid overloading BLE.
+        if(prevGamepadAxes[0] != d || prevGamepadAxes[1] != s) {
+          sendCommand(`D=${d}\nS=${s}\n`);
+        }
+        prevGamepadAxes[0] = d;
+        prevGamepadAxes[1] = s;
 
         // Buttons
         const lightCheckboxes = [
