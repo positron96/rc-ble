@@ -179,7 +179,7 @@ namespace nrf {
     };
 
     inline void ServoTimer::Servo::set_us(uint16_t us) {
-        //logf("%d\n", us);
+        // logf("set_us(%d)\n", us);
         if(owner!=nullptr)
             owner->set_us(index, us);
     };
@@ -265,7 +265,7 @@ namespace nrf {
         };
 
         void set_hbridge(uint8_t val, bool fwd, size_t idx1) {
-            // if(val!=0) logf("%d=%c%d\n", idx1, fwd?'+':'-', val);
+            // if(val!=0) logf("hbridge%d=%c%d\n", idx1, fwd?' ':'-', val);
             size_t idx2 = idx1+1;
             if(val==0) { // coast
                 data[idx1] = PWM_ZERO;
@@ -304,7 +304,7 @@ namespace nrf {
 
     inline void PWM::DualPwmMotor::set_raw(uint8_t val, bool fwd) {
         if(owner!=nullptr)
-            owner->set_hbridge(val, this->inverted?!fwd:fwd, index);
+            owner->set_hbridge(val, fwd, index);
     };
 
     inline void PWM::Pin::set_pwm(uint8_t val) {
